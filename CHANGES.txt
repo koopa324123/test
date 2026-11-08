@@ -1,0 +1,846 @@
+Changes (credit: World Flight Simulator / Simon - edited with permission)
+- js/mouseflight.js (+test): heavy virtual-stick mouse flight. Toggle with J.
+- js/controls.js: mouse flight merged with keyboard/pad, on-screen stick marker.
+- js/aircraft.js: 737 flight deck attached to airliners (seating table DECK_SEATING).
+- js/main.js: deck loader per-aircraft fit, animated yokes, look-around (drag), J action.
+- assets/cockpit_737.glb.gz: converted from your FBX (79k tris, fuselage shell removed).
+Not yet done: co-pilot mode, multiplayer/custom servers, the 9 extra aircraft.
+Session 3:
+- js/controls.js: ~ (the ` key, Backquote) now toggles mouse steering, same as J.
+  Un-toggling eases the yoke back to centre through the normal axis decay and
+  does not change heading.
+Not yet done: E/Q throttle regression (not reproduced without running the sim),
+A/D wheel-turn physics, the '~' heading/yoke physics rework, shaders, co-pilot
+(panel + GUI + multiplayer link), custom servers, and the 9 new aircraft.
+Session 4:
+- assets/boeing_787-9.glb (from Singapore Airlines 787-9, CC-BY-4.0) and
+  assets/boeing_787-8.glb (from "Boeing-787- Dreamliner", CC-BY-4.0) added to
+  replace the missing exteriors. Converted from glTF with embedded textures.
+  Credits in assets/CREDITS.txt.
+  NOT VERIFIED: scale and orientation not checked in-game. Existing aircraft
+  entries use flipZ and length values tuned for the original files.
+- Still missing: airbus_a319/320/321/330/350/380, boeing_747-8f, learjet_60,
+  f16, helicopter.
+- assets/boeing_737_max_8.glb: Southwest 737 MAX 8 exterior. Texture embedded and
+  linked to the material (was unlinked, BLEND, metallic 0.8, so it rendered
+  invisible). Not yet attached to an aircraft entry; flaps not yet separated.
+- js/aircraft.js: new aircraft entry 737 MAX 8 (id b737max8) using
+  assets/boeing_737_max_8.glb. Placeholder numbers (length, speeds, perf) are
+  estimates. No separate cockpit or DECK_SEATING entry yet; flaps/gear not split.
+- assets/airbus_a319.glb and assets/airbus_a330-300.glb added to fill the empty
+  A319 and A330-300 slots. Licences unconfirmed (see CREDITS.txt). Both have
+  unnamed, unseparated nodes: no flaps, gear or control surfaces yet. Not yet
+  verified in-game.
+- Airports added to the departure list (places.js AIRPORTS) with 3D tag:
+  SCDA Diego Aracena (Iquique), RJFK Kagoshima, EDDH Hamburg. Coordinates from
+  airports-db.js. Runway headings (hdg) are estimates: check before release.
+  Terminal models in assets/airport_*.glb. NOT YET placed in the 3D world;
+  jetways not implemented.
+- assets/cockpit_737max.glb: 737 MAX cockpit (Sketchfab_Scene.glb). Two yoke
+  nodes renamed: yoke_fo_col (first officer, x~+3.25) and yoke_cap_col
+  (captain, x~0). NOT YET: yoke wheels (roll rotation) need splitting out of
+  the yoke meshes; the game loads only one deck file, so this cockpit is not
+  wired in yet; throttles, rudders, gear lever, and screens not named/wired.
+- The 747 slot (id b747, assets/boeing_747-8f.glb) now uses the uploaded
+  boeing_777_fixed.glb and is labelled 777-300ER. The internal id stays b747.
+  Scale is UNVERIFIED (model extent 315 x 136 x 108 units; length set to 73.9 m).
+  The file is 166 MB and has no textures embedded; no cockpit; parts unnamed.
+- 777 (b747 slot): added yaw PI/2 because the model's long axis is X, not Z. Untested in-game; may need -PI/2.
+- Installed assets/airbus_a320.glb and assets/boeing_757-200.glb (textures already embedded). Added 757-200 aircraft entry (id b757). Length/span/flipZ are estimates; not verified in-game.
+- Step 2: 757 Icelandair cockpit wired in as assets/cockpit_757.glb via DECK_URLS. Seating (d 3.7, y 1.15) is a guess copied from the A320; scale and orientation unchecked.
+- 737 MAX 8 (b737max8) now uses the new 737 MAX cockpit (assets/cockpit_737max_new.glb,
+  converted from the gltf upload). Seating is an estimate (d 3.7, y 1.15). The
+  old 737 deck (assets/cockpit_737.glb.gz) remains the default for other aircraft.
+  Moving parts not yet named; textures embedded (27 images).
+- Removed the earlier mis-matched assets/cockpit_737max.glb (the unnamed Sketchfab export).
+- 737 MAX 8 reverted to old 737 deck: new MAX cockpit (cockpit_737max_new.glb) showed no interior in-game. File kept in assets/ for later debugging.
+- 737 MAX 8 reverted to the default 737 deck (assets/cockpit_737.glb.gz) while the
+  new MAX cockpit (assets/cockpit_737max_new.glb) is being checked. It is still in
+  assets/ but not referenced.
+- Replaced the A319 with the 757-200: A319 fleet entry and its seating removed, A319 traffic now uses b757, assets/airbus_a319.glb removed. Credits entry for the A319 model still lists it; remove it if you no longer use that model.
+- 777 (b747 slot): replaced cockpit with Boeing_777_Cockpit (assets/cockpit_777.glb, textures embedded, 78 named nodes). Seating set to estimate (d 3.7, y 1.15) replacing 747 upper-deck values. Yaw flipped from +PI/2 to -PI/2 because the model was rotated the wrong way; if still wrong, try 0 or PI/2 again.
+- F-16: assets/f16.glb replaced with the new F-16 model (embedded texture). Its pilot eye point (custom.eye) and yaw were set for the OLD model; check the cockpit view and orientation.
+- SU-25 (id su25) added as a fighter entry, assets/su25.glb (textures embedded). Placeholder perf numbers, no cockpit (not in DECK_SEATING).
+- Sounds copied to assets/sounds/. Not yet wired to the engines, RWR, guns or warnings.
+- Missiles copied to assets/weapons/aim9m.glb and aim120.glb. NOT yet fired, guided, or attached to the F-16.
+- NOT BUILT: flares and chaff countermeasures, guided missile lock, RWR display, reticle lock circle, weapons/guns.
+Session 5 (fighter systems, cockpits, F-16 textures):
+- assets/f16.glb rebuilt: metallic-roughness and normal maps embedded (were
+  missing, so the airframe rendered dark). Debug base64 copies of the textures
+  stripped from the node extras (83 MB of JSON), file now 41 MB.
+- Cockpit decks baked so the captain's eye is at the GLB origin, then gzipped:
+  assets/cockpit_757.glb.gz, cockpit_777.glb.gz, cockpit_737max.glb.gz.
+  The decks were ~25 m from the origin, which is why 757 and 777 never showed.
+  Eye positions are estimates from the geometry (757 fairly confident; 777 and
+  737 MAX not checked in-game). 737 MAX deck scaled 0.2 (DECK_SCALE in aircraft.js).
+- Fighter weapons (js/weapons.js, js/lock-logic.js): X starts a lock (0.85 s of
+  steady track required), R cycles AIM-120 / AIM-9M / gun, F fires (gun held),
+  T releases flares. Lock box and status line drawn over any camera view.
+- Fighter keys (fighters only, controls.js FIGHTER_KEYS): X lock, R cycle,
+  F fire, T flare, Shift+F flaps. Autopilot, ATC replies and plain flaps keep
+  their normal keys on airliners.
+- Fighter voicelines (js/jet-voices.js): altitude below 300 ft after takeoff
+  (re-arms above 500 ft); F-16 caution line for GPWS terrain/gear/stall; Su-25
+  pull-up, minimum-speed, over-G and airbrake lines.
+- Audio: fighter engine loops now use assets/sounds (interior idle inside the
+  cockpit, exterior pitch-with-throttle outside). Lock, launch and gun clips
+  play from assets/sounds via audio.playSfx / startLoop.
+- Su-25 now uses the fighter sound profile (its own recordings).
+Not done / unverified:
+- Yoke animation on the 757, 777 and 737 MAX decks: their yoke geometry is merged
+  into panel meshes and has not been split out. Only the old 737 deck animates.
+- Not wired (no sim trigger yet): f-16 rwr deploy flare / deploy chaff, f-16
+  rwr new contact, f-16 tracking rwr, f-16 launch rwr is wired to missile launch.
+- Nothing above has been run in a browser; checks were syntax, GLB parsing and
+  the lock logic tests (js/lock-logic.test.mjs).
+Session 6:
+- F-16 and Su-25 model URLs carry ?v=2 so browsers stop serving the old GLB
+  from cache (the rebuilt texture set was never reaching some browsers).
+- AI aircraft (js/ai.js): choose a type, count (up to 6) and Friendly/Hostile
+  on the start screen (AI AIRCRAFT panel). They spawn around you at takeoff.
+  Friendly units fly formation on your right wing. Hostile units attack; only
+  fighters carry weapons (other hostile types are set to Friendly).
+- Hostile fighters use the same 0.85 s lock rule and fire AIM-120 / AIM-9
+  missiles at you. Their missiles can be decoyed by your flares. Hits cost hull
+  (100%), and at zero hull you are shot down through the normal crash path.
+  RWR clips now play on real threats: launch, tracking, new contact, and the
+  inbound flare/chaff warnings.
+- Your weapons can lock and shoot down hostile AI (not friendlies).
+- AI cannot be added in flight yet. The list is read at takeoff only.
+Session 7:
+- Cockpit view: the arrow keys look around (as the right stick does). Pitch
+  stays on W/S and yaw on the rudder keys. Outside the cockpit the arrows fly
+  as before.
+- AIM-9 search growl loops while searching; the lock tone loops while locked.
+  Both stop when the lock is cancelled, lost or fired, or the weapon is switched.
+- RWR tracking tone loops while a live threat is on you (a hostile locked on, or
+  an undecoyed missile in the air). It stops when a flare takes the missile, the
+  lock is lost, or the missile ends.
+Session 8:
+- Middle mouse: hold to look around in cockpit (and outside). The browser's
+  middle-click autoscroll is suppressed, and the look ends on any release or
+  cancel, so it no longer sticks.
+- Seeker: with a cursor on the page, the lock gate and the SEARCH ring follow
+  the cursor, and a target must sit inside the gate around it. Gun fire stays on
+  the nose. Mouse flight (J) keeps the nose as the aim.
+- RWR scope on the right of the screen, heading-up. Red diamond: locked on you.
+  Amber: hostile in the sky. Red M: missile inbound. Grey M: decoyed.
+Session 9:
+- Ground forces (js/ground.js, js/ground-catalog.js): M1A2, T-90SM, T-80BVM tanks;
+  BMP-2M and M3 Bradley IFVs; infantry squads (procedural); OSA-AKM, Sky Sabre,
+  BUK-M3 and Patriot SAMs; Centurion C-RAM close-in gun. Ground units engage each
+  other across sides, use line of sight and reload, and leave burning wrecks.
+- Helicopters (AH-1, Ka-52, AH-64) fly a kinematic model and fire guns.
+- Missiles: generic model orientation (js/model-fit.js) fixes loadout missiles
+  flying sideways; proportional navigation (js/missile-guidance.js); lower speeds;
+  80 puffs/s smoke, larger and brighter.
+- RWR shows friendlies as green dots. Friendlies get green HUD boxes.
+- Module damage (js/damage.js): engines, ailerons, elevators, rudder, wings,
+  hydraulics, cockpit, fuselage, tail, fuel, gear. Hits land on the module at the
+  point of impact. A damage panel shows the last aircraft hit (top right).
+- Explosions (js/explosions.js): layered fireball, shock ring, debris, smoke, sparks,
+  dirt for bombs, and secondary blasts. Used for gun hits, missile impacts,
+  aircraft and vehicle kills, and bomb detonations.
+- AI control (js/ai.js): service-ceiling cap, a climb limit above the fight's
+  height, a stall/energy guard, and hostiles that go back to you rather than
+  chasing far targets.
+Not done yet: thermal cockpit view; targeting pod with laser-guided bombs.
+Not verified in a browser. Run the game and check model orientation, damage view and
+explosion scale before release.
+Session 10:
+- Thermal view (js/thermal.js): Z toggles a white-hot palette over the scene.
+  Aircraft, vehicles and missile plumes read hot; ground and sky read cold.
+  Hot objects are tagged with userData.heat. Fighters only.
+- Targeting pod: Shift+T toggles the pod (reticle and laser status). B lays the
+  laser on the ground at the centre of the screen. Bombs released while the spot
+  is fresh (90 s) home on it. Unguided bombs fall ballistically.
+- Bombs detonate on the terrain, with damage to aircraft and vehicles inside the
+  blast radius.
+Not verified in a browser. The pod has no zoom: the reticle is drawn over the normal view.
+Session 11:
+- Taxi graph (js/taxigraph.js): builds a node/edge network from OSM taxiway
+  centrelines and routes stand to runway entry with Dijkstra. Pure data, tested
+  in Node (test/taxi.test.mjs).
+- airports.js now keeps each tile's taxiway centrelines (taxiLines()).
+Not done: NPC ground traffic on the graph; gate and runway-entry snapping per
+airport (KPDX, KSEA, KBWI, KDCA) has not been checked in game.
+Session 12:
+- Ground traffic (js/groundtraffic.js): scripted airliners (b757 model) that park at
+  stands, taxi the taxi graph, line up and take off; and arrive on a 3-degree
+  glidepath, touch down, roll out, taxi to a stand, park, and leave again.
+  Up to 10 at once, one per stand. Runway ends come from the runway database; stands
+  from the gate list.
+- Taxi routing helpers (taxigraph.js): path lengths, position along a route, turn
+  ahead for speed control.
+- main.js: ground traffic updates when flying within 15 km of an airport.
+Not done: separation between aircraft on taxiways, pushback tugs, the approach
+itself is a scripted glidepath (no collision with terrain or other aircraft).
+Tested headless with stubs on a synthetic layout only. Not run in game.
+Session 13:
+- RWR sounds per aircraft (js/rwr-sounds.js). F-15E and F/A-18F use their own
+  launch, new-contact and lock warnings. Types without files fall back to F-16.
+  The lock warning plays once when a threat locks on; the looping tracking tone stays the F-16 tone.
+  An F-14 entry is ready, but there's no F-14 in the fleet yet.
+  A-10 (a10) uses the F-14 RWR set.
+Session 14:
+- UH-1 Huey added as a flyable helicopter (FLEET id 'uh1', assets/huey/). Uses the
+  rotary flight model. Its rotor does not spin: the model has no rotor node names.
+- Huey troop transport (ground-catalog id 'huey_ai', AI): flies to a landing zone
+  1.4 km out, lands, sets an infantry squad down beside it, then leaves.
+- Missiles are aligned to their velocity when released; bombs are aligned to their
+  velocity on release and every frame after. Bombs no longer carry a fixed yaw.
+- GroundForces.spawnAt() for placing units at a point.
+Not verified in game.
+Session 15:
+- Fighter airframe stays visible in cockpit view: it is drawn by the world camera and by the cockpit pass.
+Session 16:
+- Spawner menu scrolls: setup card, AI panel and AI list (css/style.css).
+- Fighter cockpit: exterior skin draws front faces only in cockpit view, so the interior shows.
+- Ground-fire tracers (tanks, APCs, infantry, C-RAM) are bright glowing streaks with a bloom at the muzzle.
+- Targeting pod runs an infrared picture: pod on takes the scene to thermal; pod off returns it.
+- Cockpit view hides the outer skin mesh (under the airframe group), not the cockpit, canopy or instruments. Reverted the earlier front-face material change.
+- Tank main guns fire at 0.2 rounds/s (was 0.5). Main-gun tracers are about twice as thick, with a larger bloom.
+- Targeting pod zoom: [ and ] (while the pod is on), x1 to x8, shown on the SPOT line.
+- Cockpit view also hides the canopy mesh (the glass shell around the seat), which was filling the view on every fighter.
+- Cockpit view no longer changes any aircraft visibility or render layer. It only moves the camera near plane (0.25 m inside a fighter, 2 m outside). Reverted the skin and canopy hiding.
+- Fighter cockpit: the airframe is also drawn in the close cockpit pass, with the outer skin and canopy as front faces only there. Outside view unchanged.
+- Four new fighters: Typhoon, Rafale M, F-2, F-14 Tomcat (assets/fighters/typhoon, rafale, f2, f14). Fleet entries in aircraft.js. Cockpit eye positions are estimates.
+- Airliner recordings copied to assets/sounds (737_accelerate.ogg, 737_throttle_fade_in_from_accelerate.ogg). Not yet wired into the airliner engine.
+- Gear animation wired for Typhoon, Rafale M and F-2 (gearNodes from their landing nodes).
+- Thermal palette is now black (cold) to white (hot).
+- 757 yoke moves (single 757yoke node: slides with pitch, turns with roll).
+- Cockpit deck tilt option (custom.cockpitFit.tiltDeg), for the 737 MAX deck once its angle is known.
+- F/A-18F cockpit (js/fighter-cockpit.js): a stick that tilts with pitch and roll, and a display with heading, speed, altitude, and clickable AP and GEAR buttons. Built in code; only the F/A-18F for now.
+- F/A-18F display: six modes (HDG, ALT, ATT, RDR, RWR, WPN) chosen with buttons along the foot; radar scope shows live contacts, RWR shows threats and missiles, WPN shows the selected store and lock.
+- AI fighters: lead pursuit with a dead zone (no barrel rolls on heading), one bounded turn back on overshoot (no runaway), missiles only after a shot delay in the envelope, minimum range, max 3 per engagement, cooldown between shots. Guns close in and the AI keeps chasing.
+- Jet engine loop retried every frame until it plays (it could stay silent after takeoff until the menu was reopened).
+- F-14 Tomcat replaced with the new model (assets/fighters/f14). Nose at +X (from silhouette), gear wired (f14a-gearOn/gearOff), and the F/A-18F stick and display now also fit the F-14. Engine uses the F/A-18 recordings, since no F-14 engine recordings were supplied. Hardpoints not yet placed.
+- All airliners (narrow, wide, quad profiles) use the recorded 737 engine: the roar pitches up with throttle, the throttle fade-in layer comes in above mid throttle. The synth engine is muted while it plays.
+- 777 uses its own landing gear nodes (gearNodes with an exclude list, so the gear doors are separate from the legs).
+- City lights: street lamps are bigger, brighter, with a wider halo, and the building/lamp radius is 6 km (3 km mobile, was 3.6/1.8).
+- F/A-18F cockpit: two side screens (click one to cycle its mode), a dark panel, and a bezel of lit buttons. Approximates the reference layout; not a replica.
+Session 17 (engine audio):
+- js/audio.js: AIR_PROFILES now lists 'turbofan' (the tag every airliner uses) instead
+  of 'narrow'. Before this, no airliner loaded the recorded 737 roar and all of them fell
+  back to the synthesised engine. The Cessna (narrow, piston) stays on the synth.
+- js/audio.js: the airliner synth layers (whoosh, wind, fan whine, core, buzz) now go
+  through the synthOut gate. Previously only the sub-rumble did, so the synth kept
+  sounding over the recording.
+- js/audio.js: fighter synth fallback follows the loop audible in the current view.
+  Outside, the synth now returns if the exterior recording is missing, instead of being
+  silenced by the interior loop.
+- js/audio.js: a suspended AudioContext is resumed on the first pointer or key press.
+Missing sound files (not in the folder supplied with this session): the F-16 exterior
+engine loop, the F-18 interior loop, the Su-25 loops, the 737 throttle fade layer.
+Those engines fall back to the synth until the files are added to assets/sounds/.
+Not run in a real browser: checked with a headless WebAudio stub (see audio tests).
+- F/A-18F displays (js/fighter-cockpit.js, js/main.js): the display and stick meshes are
+  tagged userData.cockpitOwn, and setCockpitLayer() skips them. It runs every outside
+  frame and used to move them to layer 0, so they stopped drawing in the cockpit pass
+  after the first time you stepped out.
+- fighter-cockpit.js click(): the raycaster tests layer 1, where the displays are. It
+  tested layer 0 by default, so presses on the screens and buttons never registered.
+Not run in a browser (no three.js in the test environment).
+Session 18 (loadout):
+- js/loadout.js: stations. getStations(spec) is the aircraft's hard points after this
+  browser's layout edits (moved, removed, added). getLoadout() is aligned to it. Old
+  per-index saves still load. Edits are in localStorage: layout:<id> and loadout:<id>.
+- js/loadout-editor.js (new): 3D view of the airframe at flight scale, with station
+  markers. Drag a marker to move its store. Add station: click the airframe to place a
+  new station, mirrored to both sides. The right-hand list picks each station's store
+  and removes stations. Reset layout restores the aircraft's own hard points.
+- js/aircraft.js: buildModel uses getStations(); exports loadPreviewAirframe() (the same
+  fit as buildModel, without gear) and loadStoreModel() for the editor.
+- js/loadout.js picker: "Edit in 3D" button opens the editor.
+- js/loadout.test.mjs: headless tests for stations, choices, migration and edits.
+Not run in a browser. The editor needs assets/weapons/loadout/*.glb; a missing store
+model shows as a grey bar.
+- Fixed: audio.js FlightAudio is now exported (main.js imports it; the page failed to load without it).
+- All module URLs now carry ?v=20261101235959 (index.html too). Browsers were keeping old copies under the old string, so earlier fixes may not have loaded.
+- audio.js logs each sound file: loaded (info) or missing/failed (warn) in the browser console.
+- Keys: a text field only blocks game keys while it is on screen; clicking the game view and starting a flight release focus from any text field.
+Session 19 (cockpit displays, instruments):
+- js/mfd-panel.js (new): F/A-18F and F-14 multifunction displays as HTML panels along the
+  bottom of the screen, shown in cockpit view only. Three displays. Each has a mode drop-down
+  and steps to the next mode when clicked: HDG, ALT, ATT, RDR, RWR, WPN, LOAD, TGP, FUEL.
+  Modes are saved in this browser. FUEL shows "not modelled yet" (no fuel quantity in the sim).
+  These are 2D panels, not yet on the 3D model. The 3D overlay in fighter-cockpit.js is unchanged.
+- js/main.js: one set of cockpit callbacks shared by the 3D overlay and the panels; panels
+  synced every frame.
+- Cache version bumped again (index.html and all module imports).
+Instrument pack (separate download, instruments.zip): dials.zip split into 11 GLBs (dial_01..09,
+  panel_10, panel_11) at 0.085 m per model unit, with textures embedded. Credit: "Flight Systems"
+  by petroanton78, CC-BY-4.0.
+Session 20 (gauges):
+- js/gauges.js (new): working altimeter, airspeed and vertical speed gauges drawn on canvas,
+  in a vertical stack at the bottom left, cockpit view only. Needles follow the flight data.
+  The dials pack artwork is not used for these: its faces have needles painted in, so they can't move.
+  Scales: airspeed 0-300 kt over 270 degrees; altimeter long hand 1 turn per 1000 ft, short hand
+  1 turn per 10,000 ft; vertical speed +/-2000 fpm across +/-90 degrees.
+- js/main.js: gauges created and synced beside the MFD panel. Cache version bumped.
+- index.html script and stylesheet versions updated to match.
+Session 21 (fixes from review):
+- js/aircraft.js: A320 neo flipZ set to false. The model's nose gear sits at the low-Z end (nose at -Z), so flipZ:true turned it around. Checked from the gear node positions in airbus_a320neo.glb; not yet checked in-game.
+- Not changed: 777 (b747 slot) built-in gear has no gear node names in boeing_777.glb, so the placeholder gear still shows. Needs geometry-based gear selection.
+- Not in this package: fighter and MH-6 assets (assets/fighters/*, assets/aircraft/mh6) were not in the upload, so their orientation and cockpit edit issues were not touched.
+Session 22 (layout files):
+- js/layout-io.js (new): export and import of editor edits as a JSON file. A file holds the stations (layout:<id>), store choices (loadout:<id>) and cockpit layout (cockpit:<id>) of one or more aircraft. Import checks the file's format, version and each entry's shape, and skips anything bad. Keys other than these three are never read or written.
+- js/loadout-editor.js: Export layout (downloads <aircraft>-layout.json) and Import layout (picks a file, applies it, reopens the editor) in the editor header.
+- Cache version bumped to 20261102120000 across index.html, css and module imports.
+- Tested in Node with a localStorage stub (export, import, rejected files, skipped entries). Not run in a browser.
+- Note: cockpit items reference model files by path (assets/...). A layout from someone else needs the same asset files in their copy, or the item will not show.
+Session 23 (console errors):
+- js/ai.js: removed a stray this._fx(dt) call in AIForces.update. The method does not exist, so every frame threw and skipped the rest of the AI update. Explosions are already ticked by tickExplosions() and smoke by the missile code.
+- js/loadout-editor.js: clicking Stores or Cockpit before the airframe finished loading threw in setTab (the roots did not exist yet). setTab now checks the roots, and the roots take the current tab's visibility when they are created.
+- Not code issues: 404s for the menu images (assets/*.webp), missing surface textures and a380 model, and 429/502 responses from the tunnel host. Check those assets are in the copy you serve.
+Session 24 (A320 neo cockpit, co-pilot lights):
+- js/aircraft.js: a320neo added to DECK_URLS (assets/cockpit_a320neo.glb.gz) and DECK_SEATING (same seating as the A320). Before this, the neo had no cockpit deck, so the editor's cockpit tab had nothing to edit. The seating is an estimate and the deck may need its eye position checked in-game.
+- js/copilot-panel.js + updateNavLights: NAV and STROBE now switch the player's real lamps once a switch has been used. Until then the lamps stay automatic at dusk.
+- Not done: the LANDING light button. The aircraft has no landing light object yet, so it still only changes the panel.
+- Not done: 777 gear (no gearNodes, its built-in gear is in unnamed meshes) and A320 neo gear (the gearNodes branch assumes separate retracted and extended states, which the A320 model may not have). Both need in-game checks before a fix.
+Session 25 (long-range traffic):
+- js/traffic.js: MODEL_RANGE raised from 45 km to 100 km. Aircraft are still built nearest-first up to the MAX_MODELS budget, so the frame cost does not grow with range.
+- js/traffic.js: aircraft with no 3D model on screen (beyond the budget, past range, or still loading) are drawn as an amber dot sprite, scaled with distance so it stays a few pixels across. Dots are removed with their aircraft. Untested in a browser.
+- Not done: 3D buildings and city lights at 100 km. The building tiles are fetched only at z14, and the radius is set by a per-quality memory budget (3.6 km MED, 5.4 km HIGH). A 100 km radius would need roughly 5,000 tile downloads at this zoom. Needs a lower-detail source for distant cities or an impostor/light layer built from another dataset.
+- Fog range (about 129 km desktop) and camera far plane (420 km) already reach 100 km; unchanged.
+Session 26 (jetways):
+- js/jetways.js (new): one boarding bridge per mapped gate. Each bridge runs from the gate toward the centre of that airport's gate cluster, where the terminal almost always sits. Tube and cab are stowed at the terminal edge, and the cab slides out to the aircraft door (about 3.5 m from the gate) when an aircraft is on that stand. Rigs farther than 2.5 km are hidden.
+- js/main.js: JetwayField created with the scene; gate lists from fetchGates feed setGates; each frame, jetways.update is given the gate the aircraft is parked on (gateUnderPlane, only when on the ground and under 3 km/h).
+- Approximate by design: the terminal is not modelled, so on large fields a bridge can point at the wrong concourse. Gates without OSM stand data get no bridge. Bridges are not collision-checked against aircraft.
+- AI hook: update(dt, pos, terrain, gate) can be called with any gate object from the same list to extend that bridge, so AI traffic can use it once it stands on a mapped gate.
+- Untested in a browser. Whether DFW's gates appear in the OSM tiles can only be checked with network access.
+Session 27 (AI airline traffic):
+- js/airtraffic.js (new): up to 36 AI airliners in flight worldwide. Each flight is a timeline: parked (600 s), pushback and taxi to the runway, takeoff roll, climb, cruise on a great circle at 10 km, descent, 8 km final approach, landing rollout, taxi to the arrival stand, parked (900 s), then removed. Flights are only built as 3D models within 100 km of the player, up to 12 at a time, nearest first. Other flights in range show as amber dots. Routes are picked from airports with a 4000 ft or longer hard runway; 40% of new flights start near the player.
+- Parking: when a gate list has been fetched for an airport (fetchGates, via main.js), AI aircraft park at a free gate from it and reserve it while parked. Otherwise they park about 400 m from the airport centre.
+- js/jetways.js: update() now takes a list of connected gates, so AI aircraft extend the same bridges as the player.
+- js/main.js: AirTraffic created with the scene; updated each frame with the player's position; the jetway update now receives the player's gate plus AI gates.
+- Checked in Node (pure functions only): a 2,240 km flight runs its whole timeline with no NaN, no altitude out of range, and no position jumps beyond the cruise speed. Not run in a browser.
+- Simplified on purpose: ground routes are straight lines (no taxiway graph, so aircraft can cut across the apron); no airways, wind or weather; AI ignores ATC and the player; no collision between aircraft or with buildings on the ground.
+- Jetways for AI aircraft only exist at the airport the player has fetched gates for (jetway rigs are built only there). Other airports have AI traffic, but no bridges.
+Session 28 (taxiways, landing):
+- js/taxiways.js (new): reads aeroway taxiway and taxilane LINES from the same OpenFreeMap tiles gates.js uses (centre tile plus its eight neighbours, within 6 km of the field). Joins them into a graph and routes between two ground points with Dijkstra. Routes are used only if both ends are within 150 m of the graph; otherwise the caller falls back to a straight line. Not checked against live tiles (no network in the sandbox).
+- js/airtraffic.js: taxi-out and taxi-in follow the taxiway graph where data exists (taxi duration = path length at 8 m/s, 60 to 900 s). Taxi data is requested for airports within 60 km of the player. Parked flights re-plan when data arrives, until they start taxiing.
+- Landing: the approach follows a 3 degree glide path to the threshold (the air leg descends on the same path), so altitude is continuous from cruise to touchdown. Checked in Node: 419 m at approach start, 7 m at the threshold, no jumps between phases.
+- Roll times scale with runway length: takeoff roll 30 to 70 s (about 70 m/s), landing rollout 25 to 60 s (about 35 m/s).
+- Coverage, measured against the shipped databases: 3,828 of 4,578 airports with an IATA code or "Intl" in the name have a hard runway of 4,000 ft or more. The other 750 have no such runway in js/runways-db.js, so AI flights cannot use them until the runway dataset is updated.
+Session 29 (AI fleet, gear, NAV, map, ATC):
+- js/airtraffic.js: AI fleet limited to the 737 MAX 8 (b737max8), 777-300ER (b747) and A320 neo (a320neo). Callsigns are generated per flight.
+- Models: still built only within 100 km of the player (MODEL_RANGE), nearest first, up to 12 at a time. Beyond 100 km no model is built and no dot is drawn.
+- Gear: AI gear moves between stowed and down over about 10 s. It goes down on the ground or below 800 m and comes up above that. The movement uses the new poseGear() in js/aircraft.js, which drives the same leg and door animation as the player's aircraft.
+- js/aircraft.js: poseGear(gear, t) added. Covers models with their own gear (userData legs and doors) and models with generic bolt-on legs. Checked in Node with fake gear objects; not checked on the real models.
+- NAV monitor: AI airliners appear as amber contacts on the NAV display within its 40 km range (js/cockpit-layout.js, paintNd; main.js getRadar).
+- Map: AI aircraft in the air or on the ground are shown on the minimap and the big map, with callsign, type, heading, altitude and speed. Aircraft parked at gates are not shown.
+- ATC: airborne AI aircraft within 20 km are included in ATC's traffic calls (main.js nearbyTraffic). This is one-way: the AI does not answer radio calls or follow instructions.
+- Not done: two-way ATC with AI aircraft (clearances, readbacks, AI following instructions). Not run in a browser.
+Session 30 (AI fleet not showing, DFW taxiways and apron):
+- js/airtraffic.js: assets/boeing_737_max_8.glb is referenced by the 737 MAX 8 entry but is NOT in the upload, so every 737 MAX flight failed to load. The failure was swallowed and the load was retried every frame, eating one of the 12 model slots. Now a failed type is dropped for the session and its flights take another airliner. Warning goes to the console. Put the file back in assets/ to bring the 737 MAX back.
+- js/airports.js: taxiway ribbons and apron polygons are merged into one mesh per material per tile (_bucket / _flush). Was one mesh per segment.
+- js/main.js: buildings.onAeroway and onAerowayDrop re-enabled, so taxiways and aprons draw again. They still appear only with 3D buildings on (they ride the same tiles).
+- Not verified in a browser. DFW's taxiway and apron data depends on the OpenFreeMap aeroway layer for that tile, which I could not reach from here.
+Session 31 (uploaded airliners as AI and player types):
+- assets/: 14 uploaded OUTPISTON models converted to single GLB files with textures embedded (CC-BY-NC-SA-4.0, see CREDITS.txt).
+  737-200 (Continental 1986, Continental 1993, KLM), 737-500 (Air Pacific), 737-300 (Southwest),
+  737-400 (S7, LOT, LOT alt texture), 767-200, 777-200 (Emirates), 777-300 (Air New Zealand),
+  747-200 (United), 757-200, 787-9. The 757-200 and 787-9 fill the files that the existing b757 and b787 entries already pointed at but the zip did not contain.
+- js/aircraft.js: new FLEET entries b732_cal86, b732_cal93, b732_klm, b735_airpacific, b733_sw, b734_s7, b734_lot, b734_lot_b, b767, b777_200, b777_300anz, b742.
+  Lengths and spans are measured from each model; perf, gearH and stats are estimates. Each airliner uses the game's generic animated gear (no gearNodes), so every one retracts and extends.
+- js/aircraft.js: b787 now flipZ true (the new file's nose is at +Z). custom.hideNodes removes built-in gear meshes that would stack on the animated gear (787, 777s, 767 marker).
+- js/aircraft.js: a model that fails to load is flagged (spec.custom.missing). The loader substitutes the A380 in that case, so this flag is what the AI uses to skip the type.
+- js/airtraffic.js: AI airliner pool now includes all the types above plus b757 and b787. Missing-model types are skipped; the substitute-airframe case switches type instead of showing an A380 at 737 size.
+- Correction to session 30: the 737 MAX failure was not a silent null. _buildModel substitutes the A380 and resolves, so the earlier catch never ran. The missing-flag above replaces that handling.
+- Not verified in a browser. Gear geometry is generic: a model's own gear was not used because the built-in gear meshes on the 777/787 are two variants per leg with no animation data to tell stowed from extended.
+- Licence: all 14 uploads are CC-BY-NC-SA-4.0 (non-commercial, share-alike). Shipping them in a commercial build is not permitted.
+Session 32 (SR-72 Darkstar, AI restricted to airliners):
+- assets/darkstar_sr72.glb: Lockheed Martin SR72 Darkstar (TopGun: Maverick) by Cem Gurbuz, CC-BY-4.0 (see CREDITS.txt).
+- js/aircraft.js: darkstar entry. fighter + hypersonic flags, length 30 m, eye [0, 0.45, -9.2], hardpoints []. vMax 6800 m/s (Mach 20 at sea-level sound speed), accel 400 m/s2 so it reaches it in about a minute, ceilFt 1,000,000 so thrust does not fade with altitude. Flight numbers are estimates.
+- js/aircraft.js: a hypersonic type gets buildHypersonic() in _buildModel; Airplane.update drives it.
+- js/hypersonic.js (new): glow starts at 80% of top speed and is full at 97%. Rim-and-nose shell over the airframe, two plume sprite stacks at the nozzles, and an ember pool in world space. Hidden inside the cockpit view.
+- Cockpit: the Darkstar uses the fighter HUD cockpit and the cockpit editor, which places parts on the airframe (no separate deck file).
+- js/ai.js: aiAllowed(spec) = civil airliners only. spawnAll skips anything else.
+- js/main.js: AI setup list shows airliners only. Fighters, helicopters, ground and air-defence units and the Darkstar are player-only.
+- Not verified in a browser. Glow look, plume position, eye point and the acceleration feel all need checking in-game.
+
+Learjet 60 integration:
+- Added OUTPISTON's Learjet 60 glTF exterior and its binary/texture dependencies under assets/learjet60/.
+- Updated the existing lear60 fleet entry; no duplicate aircraft was added.
+- Included business jets in scheduled civilian air traffic. Combat AI and aircraft selector logic were not changed.
+
+
+Boeing 787-9 Singapore Airlines replacement:
+- Replaced the missing 777-300ER model URL in the existing wide-body/b747 fleet slot with the supplied 787-9 model; the existing slot/selector wiring remains intact.
+- Added the model glTF, binary buffer, textures and CC-BY-4.0 attribution.
+- Added the authored 3.75-second landing-gear animation, sampled directly from gear position so doors open, gear extends/retracts, and doors close in sequence.
+- Added throttle-driven engine fan rotation for the player and steady fan rotation for rendered AI traffic.
+- AI traffic now eases the same animated gear sequence on approach, landing and departure.
+- Static JavaScript syntax and model dependency checks passed; in-browser visuals still need user testing.
+Session 33 (impact, wreck fire, gas, airborne loops):
+- js/cabin-sounds.js: the after-takeoff layers loop while the aircraft is in the air
+  with engines running. They start once the take-off chain has finished, layer 2
+  follows the high-power push (same thresholds as its throttle layer), and they fade
+  out on landing or shutdown. The one-shot chain is unchanged.
+- js/destruction.js: engine and cargo fires make sound. The fire alarm loops while any
+  fire burns (L&R alarm when both engines burn, single alarm otherwise). Switching an
+  engine fire on plays its voiceline (left or right). The alarm stops when the fire is
+  put out, the wing it was on comes off, or the aircraft resets. Wired from main.js
+  (destruction.setAudio). shift() added for origin rebases.
+- js/fire-fx.js: rewritten as gas. Flames and smoke are free particles in world space,
+  not attached to their source. Hot gas rises (lift falls off as it cools), particles
+  relax toward the wind, a smooth position-based flow field stirs them, and they grow
+  as they age. Flames cool white, yellow, orange, dark red. Sprites have a noise-broken
+  edge that moves. One shared cloud (sharedGas) for the whole world, so one budget.
+- js/explosions.js: the crash blast is built on the gas: a flash, a hemispherical
+  fireball, a black column, a dust shock along the ground, a plume that keeps burning
+  for ~8 s, and secondary blasts spread over a few seconds. Gas is stepped in
+  tickExplosions and shifted with the origin.
+- js/wreck.js (new): at impact the airframe is cut into chunks (triangles in the same
+  grid cell of the aircraft frame). Each chunk is a rigid piece: it keeps the impact
+  velocity plus an outward kick, falls, bounces off the terrain with some restitution,
+  slides with ground friction, loses speed to drag, tumbles, and comes to rest. Every
+  piece burns (flame and smoke emitted into the shared gas). Pieces are removed after
+  75 s, or when the aircraft respawns; the airframe is restored then.
+- js/main.js: the wreck is created on every crash, whether destruction is on or not.
+  The impact screen now has VIEW CRASH and RESET AIRCRAFT. VIEW CRASH hides the screen,
+  shows a CRASH VIEW bar with RESET, and orbits the camera around the wreck. Without a
+  choice the aircraft resets after 12 s (the countdown pauses with the game). The
+  intact airframe stays hidden after impact (chase and cockpit cameras no longer show
+  it). Origin rebases shift the wreck and the failure fires.
+- Module imports: explosions.js, fire-fx.js, destruction.js, wreck.js, cabin-sounds.js,
+  audio.js and main.js use one version string. weapons.js used an older explosions.js
+  version, which gave it a second module instance with no scene, so its booms could
+  not draw. It now shares the one instance.
+- index.html / css/style.css: crash overlay buttons and the crash view bar.
+Not verified in a browser. Checked headless with a three.js stand-in (physics, gas
+step, shatter, sound state machines, origin shifts, lifecycle). Look at: the flame and
+smoke look at close range, the number of pieces on a real airframe, and the crash
+camera framing.
+Not done: pieces do not collide with each other or with the airframe's own debris;
+mission-failed crashes show the mission screen, not the impact screen, so VIEW CRASH is
+not offered there.
+Session 34 (loose pieces, break-up, alarms):
+- js/wreck.js: every loose body is in the wreck now. Crash pieces, break-up pieces and
+  detached parts (wings, fin, tail, from destruction.js) all keep their own physics and
+  fire. Each starts with the aircraft's velocity at the moment it came off, so it carries
+  on along the trajectory, then falls, bounces, slides, and comes to rest. Every piece
+  burns for its whole life (flame sits on the piece's surface, larger sprites). The wreck
+  is cleared on respawn (aircraft.resetSerial) or when the flight ends, not when the
+  aircraft is merely not crashed.
+- js/destruction.js: BREAK APART AIRCRAFT on the failures panel. All nodes come off at
+  once in the air (main.js breakUpAircraft): a crash-style break-up with no impact blast
+  on the ground, and the impact screen. Detached parts go to the wreck.
+- Alarms (assets/sounds/alarm 1-3.ogg): alarm 1 loops for a single engine or cargo fire,
+  alarm 2 for both engines, alarm 3 for anything that detaches. Each loops until the
+  aircraft resets. The mapping of the three uploaded files to these uses is an assumption;
+  rename to swap.
+- js/fire-fx.js: flame sprites keep at least 4 px (visible from far away) and may be up to
+  600 px (not clipped up close).
+- aircraft.js: resetSerial, bumped on every respawn.
+- One version string (20261105170000) for every module that changed, and the aircraft
+  module is now loaded under one string everywhere (it was loaded under two).
+- Not verified in a browser; headless tests cover the state machines and the physics.
+Session 35:
+- wreck.js / destruction.js: loose pieces and detached parts are thrown much harder (kick and
+  launch speeds about doubled, with sideways jitter), so debris scatters further.
+- explosions.js: impact fire. A burning patch on the ground around the impact point for 20 s
+  (flames with smoke above), plus extra flames thrown across the ground with the fireball.
+  The crash effect lasts 22 s.
+- audio.js: sounds overlap. A voice line no longer cuts off or waits for the one playing.
+- destruction.js: each alarm loops on its own key, so they overlap. The engine alarm
+  (alarm 1, or alarm 2 for both engines) loops while a fire burns. When anything detaches,
+  alarms 1, 2 and 3 all loop together until the aircraft resets.
+- Not verified in a browser; headless tests cover the alarm state and the physics.
+Session 36 (explosion sounds):
+- assets/sounds: explosion layer 1 loudest / 2 distant / 3 mid loud / 4 mid loud, and
+  ear ringing after explosion.
+- js/explosions.js: crash, aircraft, bomb, missile and vehicle blasts play the four layers
+  together. Volume falls with distance from the camera (setExplosionAudio). A blast within
+  800 m also rings the ears a moment later, fading with distance.
+- Module versions moved to 20261105180000 (explosions.js changed).
+Session 37 (violent impact):
+- js/wreck.js: crash debris scatters in a 45 degree cone centred on the aircraft's direction of
+  travel (22.5 degrees either side), tilted upward, with about double the kick.
+- js/explosions.js: crash blast is larger and harsher: white flash, more fireball flame, a larger
+  shock ring, more sparks and secondary blasts. Around the impact: concrete and earth chunks
+  (solid debris that bounce and settle), dirt thrown high and falling back, and more flame and
+  smoke across the ground.
+- js/fire-fx.js: shared gas budget raised (flames 4500, smoke 8000).
+- Module versions moved to 20261105190000.
+Session 38 (AI restricted to the uploaded airliners):
+- js/aircraft.js: AI_AIRLINER_IDS (the 14 uploaded airliners: 737-200 x3, 737-500, 737-300,
+  737-400 x3, 767-200, 777-200, 777-300, 747-200, 757-200, 787-9) and aiAirliners().
+- js/ai.js: aiAllowed(spec). spawnAll skips anything outside the uploaded set.
+- js/airtraffic.js: scheduled flights use only aiAirliners().
+- js/traffic.js: live traffic maps each type code to the uploaded airliners (narrow or wide
+  class, a stable pick per type code).
+- js/main.js: the AI setup list offers only the uploaded airliners.
+- Not AI-flown any more: A320 family, A330, A350, A380, 787-8, 737 MAX 8, the Singapore 787
+  slot, fighters, helicopters and ground units (still available to the player).
+- Module versions moved to 20261105200000.
+Session 39 (attached nodes, contact break-off, trails):
+- js/wreck.js: the airframe is cut into nodes (2.5 m grid cells in the aircraft's frame) that
+  stay attached. breakTouching(): a node whose centre is below the surface (0.2 m margin, so
+  a normal landing on the wheels does not count) breaks off. Only that node: its triangles are
+  trimmed out of the live airframe mesh and it becomes a loose piece with the aircraft's
+  velocity. The trimmed index and groups are restored on respawn (clear()).
+- js/wreck.js: each node that breaks gets a dense, high-resolution flame burst (90 flames,
+  larger for bigger nodes) that drifts away as gas.
+- js/wreck.js: a flying aircraft with broken nodes leaves a dense flame and smoke trail behind
+  it. Burning pieces emit about 4x more flame while moving fast, so their trails are denser.
+- js/main.js: breakTouching runs each frame while flying, not on the ground, within 30 m of
+  the surface.
+- js/wreck.js: the crash no longer wipes loose pieces first; crash debris adds to them.
+- js/destruction.js: reset() no longer clears the wreck (respawn, menu and crash do).
+- js/explosions.js: crash fireball adds 1200 large, hot flames in a rising dome.
+- js/fire-fx.js: flame pool raised to 6000.
+- Module versions moved to 20261105210000.
+- Not verified in a browser. Notes: the node table is built once per flight on the first frame
+  near the ground (a short hitch is possible on big models). Nodes are a grid of the airframe,
+  not the model's own parts.
+Session 40 (one blast sound, no sphere fireballs):
+- js/explosions.js: the blast sound plays once per event. Secondary blasts are silent (boom
+  takes a silent flag) and a second blast within 2 s does not replay the layers. The ear ringing
+  follows the same single event.
+- js/explosions.js: the low-resolution sphere flash and fireball layers are removed. Every blast's
+  fireball is now gas flame (count follows the blast's size).
+- Module versions moved to 20261105220000.
+Session 41 (tuning the crash fire):
+- Debris slower: wreck pieces and detached parts launch at about 1/3 of the earlier speed.
+- Particles larger and fuller: flame sprites about 2.4x, smoke about 1.75x. Minimum on-screen size
+  raised to 10 px. Sprite edges keep more gas; flames have a white-hot core and stronger alpha.
+- Flames more violent: higher buoyancy and turbulence; fireball flames thrown faster; flash and
+  sparks larger and more.
+- Burning ground spreads further: radius about 2.5x, emission about 1.7x, lasting 30 s.
+- Impact shockwave removed: the expanding ring is gone from the crash blast (and its outward dust
+  rush slowed, so the dust rises instead).
+- Module versions moved to 20261105230000.
+Session 42 (slow motion; rigid pieces with hitboxes):
+- Slow motion: the Backslash key, or the SLOW button in the toolbar, cycles 1x, 1/2, 1/4, 1/10.
+  The whole simulation step is scaled (flight, debris, fire, explosions). It resets to 1x when the
+  flight ends.
+- js/wreck.js: every loose piece is a rigid body with its own physics. Its hitbox is 40 points on
+  its own surface (the lowest, the outermost, and a spread), chosen once when the piece is made.
+  Each point is tested against the terrain and against other pieces, and each contact applies an
+  impulse at its point (restitution, friction, spin). Inertia comes from the piece's real extents.
+  Pieces pushed by another stay out of the ground.
+- Piece-to-piece contacts use a grid, so each piece is checked only against its neighbours (about
+  4.6 ms a frame with 255 pieces).
+- Module versions moved to 20261105250000.
+- Not verified in a browser. Pieces are rigid boxes of their hitbox points, not the exact mesh. Other
+  aircraft and buildings are not in the hitbox test yet.
+Session 43 (free camera after a crash; silent break-up in the air):
+- js/main.js: FREE CAM on the impact screen and in the crash-view bar. WASD move, Shift faster,
+  E/Q up and down, drag to look, wheel changes speed. The camera stays above the terrain. ORBIT
+  CAM takes it back to the orbit view. Reset and return to menu turn it off.
+- js/main.js: a break-up in the air plays no blast sound (the blast's sound is suppressed; the
+  fire and debris are unchanged).
+- index.html: FREE CAM buttons on the impact screen and in the crash-view bar.
+- Module versions moved to 20261105260000.
+- Not verified in a browser.
+Session 44 (crash comes apart node by node):
+- js/wreck.js: beginCrash(). A crash no longer shatters the whole airframe. The attached nodes
+  keep their velocity and fall; each node that reaches the ground breaks off there (breakTouching),
+  and the rest continue. Once nothing is attached the aircraft is gone. A crash still attached
+  after 25 s is shattered whole so the flight always ends. Breaking the airframe on purpose
+  (BREAK APART AIRCRAFT) still shatters it all at once.
+- js/main.js: the attached airframe stays visible after a crash. Node break-off is checked each
+  frame while the crash body is attached; a node coming off raises the alarm.
+- Module versions moved to 20261105270000.
+- Not verified in a browser.
+Session 45 (explosions only at 500+ kts; compact impact screen):
+- js/main.js: the crash explosion happens only when the true speed at impact is 500 kts or more
+  (vel length x 1.94384). Slower impacts come apart with no explosion. The break-up in the air
+  gets its blast only at 500 kts or more too, still silent.
+- css/style.css, index.html: the impact screen is a compact panel in the top right (no full-screen
+  dim), with a smaller title. Its buttons are unchanged.
+- Module versions moved to 20261105280000.
+- Not verified in a browser.
+Session 46 (attached nodes stay connected after a crash):
+- js/wreck.js: after a crash the attached airframe is one rigid body. Its contact points are the
+  centres of its attached nodes. The nodes that touch the ground break off; the rest stay connected
+  and the airframe tips and settles on them, so its other nodes meet the ground again later and
+  break off then. The body's mass, inertia and tilt follow the nodes still attached.
+- Module versions moved to 20261105290000.
+- Not verified in a browser. The body is a rigid approximation (points at node centres), not the
+  exact mesh; a crash with no further ground contact settles with its remaining nodes attached.
+Session 47: removed the tipping rigid body for the attached airframe after a crash (session 46).
+The crash motion is back to the simpler version: the attached airframe falls as one, and its nodes
+break off as they touch the ground. Module versions moved to 20261105300000.
+Session 48: the jets are back in the AI spawner. aiAllowed() accepts the uploaded airliners and any
+fixed-wing fighter (aiJets(), not helicopters). The AI setup panel lists Airliners and Jets; it
+defaults to the F-16 when it is in the catalog. Scheduled and live traffic still use airliners only.
+Module versions moved to 20261105310000.
+Session 49 (AI jets: ground contact and crashes):
+- Why AI jets floated through the ground: aircraft.js counted ground contact only where the elevation
+  tile is fine (heightInfo z >= 12). AI jets fly far from the player, often over coarse or unloaded
+  terrain, so they had no ground contact there. AI aircraft (aircraft.aiControlled) now always
+  collide with the ground; the spike veto still applies.
+- Why AI jets stayed whole and then vanished: an AI crash called _remove() at once, so there was
+  no node break-off or wreck. ai.js _aiCrash() now starts a wreck for the crashed jet (beginCrash
+  and breakTouching, as for the player), and _updateCrashes() runs it until the debris is gone or
+  after 120 s.
+- AI crashes make an explosion only at 500 kts or more, as for the player.
+- Module versions moved to 20261105320000.
+- Not verified in a browser.
+Session 50 (every aircraft collides with the ground; more nodes):
+- js/aircraft.js: the terrain detail gate is gone for all aircraft, player included. The gate
+  stopped ground contact where the terrain was coarse, so aircraft passed through the ground there.
+  The spike check and the spawn grace still apply.
+- js/wreck.js: nodes are cut to 1.6 m cells (was 2.5 m), up to 2000 per airframe (was 900), so an
+  airliner has about 1600 nodes. Loose debris up to 480 pieces (was 300).
+- Cost: the node table is built once per flight (about 0.3 s for an airliner-size mesh, at the first
+  frame near the ground). Piece physics about 7 ms a frame with 314 pieces.
+- Module versions moved to 20261105330000.
+- Not verified in a browser.
+Session 51 (ground placeholder; half the nodes burn):
+- js/aircraft.js: ground contact needs real elevation data (gi.z >= 0). The last change had let
+  points with no elevation tile (the terrain returns a 0 m placeholder, z = -1) count as ground,
+  so aircraft over high terrain were brought down to sea level and glided on. Coarse data (z 0-11)
+  is real and is now used.
+- js/wreck.js: half of the detached nodes burn (flame and smoke), chosen at random per node; the
+  rest break off without fire. The plane's trail and the break-off fireballs are unchanged.
+- Module versions moved to 20261105340000.
+- Not verified in a browser. Known limit: where the terrain is coarse, the collision height can
+  differ from the drawn ground, which can still show as a small float or sink.
+Session 52 (crash = tail strike, fixed wing):
+- js/aircraft.js: the fixed-wing crash rules are gone: a hard touchdown, a banked or rolled-over
+  landing, and a gear-up contact are now landings, not crashes. A crash is decided by the tail:
+  when the tail point (end of the fuselage, rotated with the aircraft) is below real ground
+  (elevation data present) for 0.05 s, the aircraft crashes (onCrash 'TAIL STRIKE'). Then the node
+  break-off and the wreck run as before. God mode is still respected.
+- Applies to AI fixed-wing aircraft too (they use the same update).
+- Helicopters keep their own ground logic, unchanged.
+- Module versions moved to 20261105350000.
+- Not verified in a browser; the aircraft physics is not in the headless tests.
+Session 53 (fix: game broken on the flight path):
+- js/aircraft.js: the tail-strike check read the aircraft length from the performance block
+  (s.geo.len), which has no geo, so every fixed-wing frame threw a TypeError and the game stopped.
+  It now reads this.spec.geo.len.
+- Checked headlessly: every module loads; a fixed-wing flight runs with no errors; a nose-up tail
+  on the ground crashes the aircraft (TAIL STRIKE); a level aircraft clear of the ground does not.
+- Module versions moved to 20261105360000.
+Session 54 (frame errors from the console):
+- js/aircraft.js: the tail check falls back to a 30 m length when a spec has no geo block (it threw
+  "reading 'len'" on some aircraft, which stopped the frame).
+- js/taxiways.js: routeOnGround accepts a taxi graph only if it has a nodes array (it threw
+  "reading 'length'" from air-traffic taxi planning, which stopped the frame every time).
+- Module versions moved to 20261105370000.
+- Not fixed here (environment, not code): missing asset files (textures, thumbnails, sounds, voices),
+  no multiplayer server on localhost:4990, and the live-traffic API blocked by CORS.
+Session 55 (stale module versions):
+- The browser was loading older copies of changed files: the screenshot's stack traces showed
+  aircraft.js at 20261105350000 (before the fix) and taxiways.js at 20261102120000. Several modules
+  were still imported under old version strings, and my earlier bumps only matched the newer 2026110x
+  strings, so fixed files could be served from cache.
+- All modules and index.html now use one version string, 20261105380000. Reload the game with the
+  cache cleared to pick up the fixes from sessions 53 and 54.
+- Console noise that is not code: missing asset files (textures, thumbnails, sounds, voices, gear.glb),
+  the multiplayer server on localhost:4990, live-traffic API blocked by CORS, and WebGL context loss.
+Session 56 (debris fans out, skids instead of sticking):
+- js/wreck.js: debris scatters in every direction (a full turn, tilted upward), not a 45 degree
+  cone. Crash debris keeps the aircraft's velocity and adds this spread.
+- Ground friction per piece is low (0.25-0.45), and bounce is a little livelier (0.2-0.42), so
+  pieces skid and roll rather than stopping dead.
+- A piece only comes to rest after it has been still on the ground for 0.6 s, so it no longer freezes
+  mid-slide.
+- Module versions moved to 20261105390000.
+- Not verified in a browser.
+Session 57 (AI and player take-offs: tail strike too sensitive):
+- The tail strike fired on normal rotation: a 737-size aircraft's tail reaches the runway at about
+  8 degrees nose-up, so AI and player take-offs crashed. A strike now needs the tail 1.5 m below the
+  surface, and on the ground only beyond 14 degrees nose-up.
+- Tested headlessly: a tail 20 degrees nose-up in the air still crashes; a level aircraft 40 m up
+  does not. Ground over-rotation could not be tested headlessly (the flight code levels the aircraft
+  on the ground when no input is given).
+- Module versions moved to 20261105400000.
+- Not verified in a browser. AI behaviour other than take-off rotation has not been checked.
+Session 58 (more realistic crashes: wings hold, nose folds):
+- js/wreck.js: each crash picks a profile. In 60% of crashes the wings hold: 70% of the wing nodes
+  that touch the ground stay attached, so the wing stays together and only a bit of it breaks off.
+  In 50% the nose buckles: at the first nose contact, the nose nodes become one folding section that
+  crumples back and up about a hinge at the nose join (up to about 60-85 degrees). It is lifted clear
+  of the ground first, stops if a piece would push into the ground, and its pieces fall under physics
+  when it reaches its limit.
+- Regions: a node is nose (front), tail, wing (outboard of the fuselage) or fuselage, from its place in
+  the airframe (span along x, length along z, nose at +z).
+- Tested headlessly: the nose folds down through the first half second without stopping; with wings
+  holding, 9 of 11 touching wing nodes stayed attached.
+- Module versions moved to 20261105430000.
+- Not verified in a browser. The wing hold and nose fold are approximations on a grid of nodes, not the
+  model's real structure; the nose pieces are not a rigid assembly with joints.
+Session 59 (engines detach and swing over the wing; wind resistance; slower flaps pitch; 787-9 floor;
+speak to ATC):
+- js/wreck.js detachEngine(): an engine comes off at its pylon. Its nodes form one section that swings up
+  and over the wing about the pylon (about 170 degrees, about 2-3 rad/s), then lets go with the aircraft's
+  velocity. Failure panel: DETACH LEFT / RIGHT ENGINE (destruction.js detachEngine; the engine's fire
+  emitter is removed).
+- Wind resistance: pieces (debris, engines, wing sections) have quadratic drag, scaled by size (area over
+  mass), replacing the linear drag.
+- js/aircraft.js: the nose-up from flaps eases over about 2 s (was about 0.3 s). Visual attitude; the
+  flight path is unchanged.
+- js/aircraft.js: gear-animation models (787-9 Singapore) sit on the lowest point of the whole drawn
+  model, including the nacelles and tail, not only the wheels.
+- js/voice-atc.js (new): SPEAK TO ATC button. Browser speech recognition (Chrome or Edge); what you say is
+  matched to the options ATC is offering now (pickOption) and the best one is chosen. Needs a microphone
+  permission and a secure page (https or localhost).
+- Fixed a malformed version on the geo.js import (2026110543000). All modules use 20261105440000.
+- Test change: the landing-slide check now requires speed to fall to half, not a quarter, since
+  wind resistance and lower friction keep debris moving longer.
+- Not verified in a browser.
+Session 60 (debris settles):
+- Contact spin is damped while a piece touches the ground (a tumble dies down), so pieces come to rest.
+- Ground friction range raised to 0.35-0.55: most debris is at rest within about 20 s of a crash.
+Session 61 (MD-11, its own sound pack, alarms one at a time):
+- The MD-11 (FedEx) is in the catalog: assets/md11/ (glTF, textures). Length 62.2 m, span 51.4 m, nose at
+  -Z (the tail fin is at +Z), so flipZ is off. Also added to the AI airliner list and the wide-body live
+  traffic list. It has the two wing engines; the centre tail engine has no separate sound or fire position.
+- Sound packs: an aircraft with a soundPack plays ONLY the files in assets/sounds/<pack>/ (listed in its
+  manifest). A file the pack lacks is silent, never another aircraft's sound. The MD-11 pack is md11 (54
+  sounds). Its aliases: the alarms play its own fire alarms (alarm 1 -> fire alarm, alarm 2 -> engine fire
+  alarm L&R, alarm 3 -> fire alarm), since its folder has no separate detach alarm. The synthesised engine is
+  silent while a pack is set. Its engine is its own recording (md-11 engine sound).
+- playSfx now returns a handle (stop(), and onended for sequencing).
+- Detach alarms play one at a time (alarm 1, then 2, then 3, round and round) instead of all at once; a
+  reset cuts the one playing.
+- Module versions moved to 20261105460000.
+- Not verified in a browser. Not checked: the MD-11's orientation and wheel placement in the game (its
+  glTF gear is not split into legs, so it uses the whole-model lowest point).
+Session 62 (trijet centre engine; Boeing 727):
+- Trijets (spec.trijet: MD-11, 727) have a third engine at the tail, on the centre line. The failure
+  panel shows ENGINE C FIRE and DETACH CENTRE ENGINE for trijets only (class tri-only, shown when a
+  trijet is selected). The centre engine's fire emitter and detach work like the wing engines'; the fire
+  alarm covers it too.
+- Boeing 727-200 (assets/b727/, nose at +Z so flipZ on, length 46.7 m, span 32.9 m) is a selectable
+  trijet and in the AI and live-traffic lists. Its sound pack (assets/sounds/727/, 12 sounds: alarms and
+  callouts) gives the alarms: alarm 1 -> engine fire bell, alarm 2 and 3 -> master warning. The pack has
+  no engine recording, so the generic engine stays audible for the 727 (PACKS['727'].synth).
+- Module versions moved to 20261105470000.
+- Not verified in a browser. The 727's gear uses the whole-model lowest point; the centre engine's
+  position is estimated from the tail (0.33 x length back) on the centre line.
+Session 63 (MD-11: its own call-outs, gear, and 777 flight deck):
+- Old sounds on the MD-11: the cabin sounds (GPWS, cabin layers) cached their clips once, from the first
+  aircraft, and never reloaded them. audio.packEpoch now changes with the pack, and the cabin sounds
+  reload their clips when it does.
+- MD-11 call-outs now come from its own folder: engine fire call-outs use engine 1 fire (right),
+  engine 2 fire (left) and engine 3 fire (centre); GPWS approaching minimums and overspeed use the MD-11's
+  own versions.
+- The MD-11's gear is inside its single mesh (no gear nodes exist in the file). carveGear() moves the
+  triangles inside three boxes (nose gear, and the two main gear bays under the wings; 1,536 of 8,608
+  triangles) into their own mesh, gear_carved, which the existing gear code treats as the undercarriage
+  (legs, retraction, doors). The boxes are estimates from the geometry.
+- The MD-11 flies the 777 flight deck (assets/cockpit_777.glb.gz) with the same seating as the 777.
+- Module versions moved to 20261105480000.
+- Not verified in a browser. The gear boxes may need tuning in the game; the centre engine's fire call-out
+  file is engine 3 fire.
+Session 64 (whole-engine detach; repeating engine fire call-outs):
+- detachEngine takes the whole nacelle: nodes inside an ellipsoid around the engine (wide across,
+  long fore and aft), not a small sphere. The MD-11 centre engine test takes 11 nodes at the tail.
+- Engine fire call-outs (engine 1, 2 and 3 fire) repeat: each plays to its end, waits 0.4 s, and plays
+  again while that engine burns. They stop when the fire is put out, when the engine comes off, or on reset.
+- Module versions moved to 20261105490000.
+- Not verified in a browser; the nacelle extent is an estimate from the aircraft's size.
+Session 65 (engine detach on every aircraft):
+- Engine detach failed on aircraft whose engine region caught no nodes, and silently did nothing. It now:
+  uses the aircraft's engine positions, or estimates them from the span when there are none; takes the
+  nodes nearest the engine if the nacelle region is empty; and reports "No left/right/centre engine to
+  detach on this aircraft" when nothing can be taken.
+- Module versions moved to 20261105500000.
+- Not verified in a browser.
+Session 66 (engine detach takes only the nacelle; never the wing):
+- detachEngine selects nodes inside a box around the engine: within half the nacelle's width across,
+  within half its length fore and aft (length x 0.06), and from below the engine up to 0.5 m above its
+  stored position. Anything higher (wing, fuselage, fin) is never taken.
+- The nearest-node fallback is removed. If no node is in the nacelle box, nothing comes off.
+- Tested: a 14-node nacelle comes off; 55 wing nodes stay attached.
+- Limit: the box relies on the stored engine position. If a model's engine position is above its wing, the
+  top limit can catch wing nodes; that case cannot be checked without the model files.
+- Module versions moved to 20261105510000.
+Session 67 (no snap on crash; slim landing envelope; MD-11 middle gear removed):
+- Why the aircraft snapped upright: on touchdown the ground-roll logic slerps the attitude to heading-only
+  at about 3 per second, so the bank and pitch were levelled before a crash could be judged. The check now
+  runs at the moment of contact, before any levelling, and a crash does not level the aircraft.
+- A landing needs the aircraft within 15 degrees of level in bank and in pitch (landingEnvelope()). Outside
+  that at touchdown, or leaving it on the ground (a bounce or a roll), it is a crash: BAD LANDING or ROLLED
+  ON THE GROUND. Tested the envelope values: 14 degrees bank accepted, 20 rejected; pitch beyond 15 rejected.
+- MD-11 middle gear: a drop box under the fuselage between the main bays (gearDropBoxes) removes that
+  section from the model. This also removes a strip of the lower fuselage between the main bays.
+- Module versions moved to 20261105520000.
+- Not verified in a browser. The touchdown path was not exercised headlessly (the stand-in does not model a
+  descent to the runway).
+Session 68 (fire call-out plays twice; engine detach finds more engines):
+- The engine fire call-out plays twice, 0.4 s apart, then stops. The fire itself keeps burning.
+- "No engine to detach" appeared on some aircraft because the nacelle box missed the engine when it sits a
+  little off its stored position. The box is wider (half width max(2.2, r x 0.9), half length max(3, len x
+  0.07), down max(2.2, r)); if it is still empty, a second search takes nodes within 3.8 m of the engine that
+  are not above the top of the nacelle (so never the wing).
+- Synthetic checks: the wing stays attached (63 wing nodes). On a thin synthetic airframe the engine region
+  finds only a few nodes, so this has not been checked on real models.
+- Module versions moved to 20261105530000.
+- Not verified in a browser.
+Session 69 (cockpits by family; placeholder gear; landing light):
+- Every 737 (all the 737 entries, including the MAX) uses the 737 MAX flight deck (assets/cockpit_737max.glb.gz),
+  with the same scale (0.2) and seating as the MAX.
+- Both 777s (b777_200, b777_300anz) use the 777 flight deck; the 757 keeps its own. The 767 has no deck yet.
+- Placeholder gear is smaller (wheel radius 0.42 m, was 0.55) and in more detail: oleo strut with piston,
+  side brace, axle, and each wheel with tyre, rim, hub and brake disc. The wheels still touch the ground.
+- Landing light: a spotlight under the nose, aimed to land 61 m (200 ft) ahead on the ground (its aim point
+  follows the terrain). The co-pilot panel's LANDING button turns it on and off (it was wired to nothing before).
+- Module versions moved to 20261105550000.
+- Not verified in a browser: the deck seating for the 737s and 777s is copied from the MAX and 777 estimates;
+  the light's brightness and beam size are estimates.
+
+Session 5 — gear, airport lighting and voice ATC:
+- Default procedural landing gear now has extra oleo/piston detail, scissor links,
+  hydraulic lines, clamps, brake hardware, machined wheel faces and lug fasteners.
+- Landing lights now use a stronger spotlight with a 45-degree full beam and a
+  subtle visible additive cone. Beam direction follows the aircraft and ground target.
+- Runway, threshold/end and taxiway light bulbs are larger and brighter, with a
+  small daylight baseline and stronger dusk/night visibility.
+- Voice ATC now builds a 100-entry phrase bank for each live radio-menu option,
+  supports natural paraphrases, fuzzy word matching and up to eight recognition
+  alternatives; newer browsers also receive contextual phrase biasing.
+
+Session 5:
+- Added the Indonesian Presidential Airbus A320 as a separate selectable aircraft.
+  Its supplied glTF, binary mesh and textures are stored in
+  assets/airbus_a320_indonesian_presidential/.
+- Wired the A320's authored landing-gear animation, filtering the source animation
+  down to wheel, nose-wheel and gear-door/mechanism tracks so unrelated flight
+  control animations do not run as part of the gear cycle.
+- Set the Singapore Airlines 787-9 and the new A320 gear animations to 0.75x
+  playback speed for both player aircraft and AI traffic.
+
+
+2026-11-08
+- Added a non-weapon multiplayer player-tracking panel. Select another connected pilot to display live range, bearing, altitude, aircraft type and heading; tracking can be unlocked at any time.
+- Missile lock-on and guidance were not changed.
+Session: sound and lights
+- js/sonic-boom.js: boom echo replaced with a short reverb. Below 3000 kts the
+  boom is assets/sounds/sonic_boom_below_3000.mp3 (the uploaded recording); at
+  3000 kts and above it is the DCS boom. After a jet passes the camera, its
+  engine drops further in volume (PAST_QUIET, PAST_RANGE).
+- js/main.js: tower camera waits 1.25x the flyby hold (25 s) before moving.
+- js/streetlights.js: far lamps out to the terrain view distance, from z9 road
+  tiles. Smaller and dimmer than the near lamps, hidden inside 6.5 km.
+- js/buildings.js: decodeLayers exported for the far lamp loader.
+- js/sonic-boom.js: below-3000 boom is the default for the flyby camera, and for your own jet passing within 2500 ft (762 m). DCS above 3000 kts otherwise.
+- js/sonic-boom.js: boom volume drops 1% per 100 m from the camera; pitch-down target now depends on distance (0.85 near, 0.6 at 4 km).
+- assets/sounds/tower_camera_sonic_boom.mp3: replaced with the new tower camera boom recording.
+- js/aircraft.js: landing light beam fixed to open toward the ground (was flipped), and now a soft radial/distance falloff instead of a hard cone.
+- js/aircraft.js: landing beam visible length capped at 180 m and only drawn below 900 m AGL (was scaling to the ground far below).
+- js/aircraft.js: landing beam shader reworked to a flashlight-style hot core with soft spill, fading along its length.
+- js/buildings.js: walls take the full satellite colour under them; each wall edge gets a parapet rim; night windows glow warmer and brighter (setNight). js/main.js: buildings.setNight uses full night (was 0.6).
+- js/airtraffic.js: AI airliner cap raised to 5000. Distant contacts are one shared point cloud (one draw call), not a sprite each. New flights spawn 40 per frame. index.html and js/main.js: AI airliner picker goes up to 5000.
+- js/airtraffic.js: international airports get their real gate lists (looked up on first use, 3 at a time). Spawns prefer airports whose gates are known, so aircraft park on stands there. Other airports keep the old centre-point parking.
+- js/ai.js: squadron formation. Friendly wingmen form on the player (wedge, line, echelon, trail, diamond) with adjustable spacing and natural drift. They approach gently and their controls lag like a real aircraft. ADD 2 WINGMEN spawns them. js/main.js and index.html: squadron panel on F3.
+- js/airtraffic.js: flights call in on the radio at each stage (taxi request, ready for departure, inbound, taxi to gate) within 40 km; the controller answers 2.5-4.5 s later. js/audio.js: aiRadio queue, one transmission at a time. js/radio-voices.js (new): per-pilot voice (installed English voice + pitch + rate), fixed controller voice.
+- js/aircraft.js: fighter flight decks wired (f16, f14, f22, f2, su35, mig29, su25, rafale, typhoon). Each loads assets/cockpit_<name>.glb.gz and is placed at its custom.eye. The su25 has no eye point yet, so it gets no deck.
+- js/airtraffic.js: AI airliners brake over ~1,350 m from touchdown (LAND_ROLL_M), decelerating, then leave the runway at that point (arrExit). Was a straight line along the whole runway in a fixed time.
+- js/taxiways.js: AI taxi routes connect from the stand to the nearest taxiway up to 1.2 km away (was 150 m, then a straight line across the apron).
+- js/aircraft.js: player rudder authority in the air is 0.55 of the old value (RUDDER_AIR). Nosewheel swing is halved and lags the pedals (NOSEWHEEL_MAX, NOSEWHEEL_LAG). Brake decel is 1.8 m/s² (was 4.5), so stops take more runway.
+- server/atc-server.mjs + server/README.md: tower AI server (Anthropic, shared secret, rate limit, daily cap, CORS to one origin). Picks only options on screen. js/atc-ai.js: game client (set ATC_AI_URL and ATC_AI_SECRET). index.html + js/main.js: tower chat panel on F4.
+- js/airtraffic.js: nearbyFlights() for the tower; setHeld() holds or releases a flight (a held flight stands still). The tower's situation includes nearby traffic.
+- server/atc-server.mjs: the tower can hold or release one listed aircraft (traffic_action). Callsigns not on the list are dropped.
+- js/main.js + js/aircraft.js: fighters keep their built-in cockpit while the separate deck loads or if the deck file is missing (cockpitFallback). Fixes the missing cockpit view introduced by the fighter deck change.
+- js/main.js: window.shadowDebug() console diagnostic for shadow and light state.
+- js/airtraffic.js: international airports = IATA code + "International/Intl" in the name, or a listed major hub, and a long runway (8,000 ft+), two or more runways, or a major hub. 980 airports qualify. Military, municipal, regional and airfield names are never international.
+- js/airtraffic.js: aircraft spawn only at international airports with a free gate. The open-field parking fallback (the rings of aircraft) is removed. An airport with no free gate gets no new flight. Destinations are chosen uniformly from the whole world.
+- js/aircraft.js: F-15E and MiG-35 added to fighter cockpit decks. js/main.js: cockpit loader accepts cockpit_<name>.glb.gz or cockpit_<name>.glb, and shows an on-screen message when a cockpit file is missing.

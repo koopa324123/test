@@ -1,0 +1,2904 @@
+/* ATLAS — Global Flight Simulator · blue / white / orange / black */
+:root {
+  --ink: #04070d;
+  --panel: #0a1220;
+  --panel2: #0e1830;
+  --line: #1b2a4a;
+  --blue: #2f6fff;
+  --blue-soft: #7ea4ff;
+  --orange: #6ea8ff;          /* accent — now a soft blue (blue/white theme) */
+  --amber: #6ea8ff;           /* legacy alias */
+  --text: #f4f7fb;
+  --dim: #8fa0bd;
+  --warn: #ff4d3a;
+  --ok: #38d18a;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--ink);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+button {
+  font-family: inherit; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s, transform 0.12s, box-shadow 0.15s;
+}
+
+/* touch-action: none — the 3D view owns every gesture on it, so the browser
+   never pinch-zooms, double-tap-zooms or rubber-band-scrolls the page while
+   you are flying. The landing page keeps pan-y so it can still scroll. */
+#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#hud { touch-action: none; }
+/* The combining glass. Sits over the world and under every panel, never takes
+   a click, and is only ever displayed from the pilot's eye (see main.js). */
+#fhud {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  display: none; pointer-events: none; z-index: 6;
+}
+body.is-touch { overscroll-behavior: none; }
+
+/* ============================= LANDING ============================= */
+#landing {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; flex-direction: column;
+  background:
+    radial-gradient(1100px 700px at 82% 40%, rgba(47,111,255,0.14), transparent 55%),
+    radial-gradient(700px 500px at 0% 100%, rgba(255,106,31,0.06), transparent 55%),
+    var(--ink);
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+#landing.hidden { display: none; }
+
+.topnav {
+  display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+  padding: 14px clamp(16px, 4vw, 44px);
+  border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 30;
+  background: rgba(5,8,15,0.92); backdrop-filter: blur(10px);
+}
+.nav-brand { font-family: 'Anton', sans-serif; font-size: 24px; letter-spacing: 0.04em; display: flex; align-items: center; gap: 8px; }
+.brand-mark { color: var(--orange); transform: rotate(-45deg); display: inline-block; }
+.nav-live { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.12em; color: var(--dim); margin-left: auto; }
+.nav-live b { color: var(--text); }
+.nav-hot { margin-left: 14px; color: var(--blue-soft); }
+.live { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); animation: pulse 1.6s infinite; margin-right: 4px; }
+@keyframes pulse { 50% { opacity: 0.3; } }
+.cs-wrap { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.16em; color: var(--dim); }
+.cs-wrap input {
+  background: var(--panel2); border: 1px solid var(--line); color: var(--orange);
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.14em;
+  padding: 6px 9px; width: 104px; margin-left: 8px; outline: none; text-transform: uppercase;
+}
+.cs-wrap input:focus { border-color: var(--orange); }
+
+.hero-simple {
+  flex: 1 0 auto; display: grid;
+  grid-template-columns: minmax(380px, 500px) minmax(440px, 700px);
+  justify-content: center; align-items: center; gap: clamp(28px, 4vw, 110px);
+  max-width: 1440px; margin: 0 auto; width: 100%;
+  padding: clamp(10px, 2vh, 24px) clamp(24px, 4vw, 64px);
+  min-height: 0;
+}
+.hero-left { max-width: 620px; width: 100%; justify-self: start; }
+.hero-left h1 {
+  font-family: 'Anton', sans-serif;
+  font-size: clamp(44px, 6vw, 88px);
+  line-height: 0.95; letter-spacing: 0.01em;
+}
+.hero-left h1 .o { color: var(--blue-soft); }
+.hero-sub { margin: 14px 0 20px; color: var(--dim); font-size: clamp(13px, 1.3vw, 16px); line-height: 1.55; max-width: 46ch; }
+
+/* stepped setup card */
+.setup-card {
+  background: rgba(10,18,32,0.55); border: 1px solid var(--line);
+  border-radius: 16px; padding: clamp(16px, 1.8vw, 24px);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+  /* every step renders at the SAME card height — no layout jumps between
+     steps; primary buttons pin to the bottom edge */
+  position: relative;
+  /* 640 rather than 600: the departure panel left the confirm step ~35 px over,
+     so it scrolled on an otherwise roomy screen. max-height still wins on short
+     windows, where .cf-opts scrolls instead. */
+  height: 640px; max-height: 84vh;
+  display: flex; flex-direction: column;
+}
+.setup-step { display: none; }
+/* min-height:0 lets the step SHRINK inside the fixed-height card — without
+   it flexbox refuses and the fleet grid spills out over the page */
+.setup-step.sel { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; animation: stepin 0.22s ease-out; }
+.setup-step.sel > .btn-primary.big { margin-top: auto; }
+
+/* SHORT SCREENS (landscape phones): a locked 600px card cannot fit the
+   content, and overflow:hidden then CLIPPED the CONTINUE button off the
+   bottom — dead end. Let the card size to its content and the page scroll. */
+@media (max-height: 620px) {
+  .setup-card { height: auto; max-height: none; }
+  .setup-step.sel { overflow: visible; }
+  .fleet-row { max-height: 46vh; }
+}
+@keyframes stepin { from { opacity: 0; transform: translateY(6px); } }
+.step-head {
+  display: flex; align-items: center; gap: 10px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.22em; color: var(--text);
+  margin-bottom: 14px;
+}
+.step-no {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--blue); color: #fff; font-size: 12px; font-weight: 700;
+}
+.step-change {
+  margin-left: auto; background: none; border: 1px solid var(--line); color: var(--blue-soft);
+  border-radius: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.08em; padding: 5px 10px;
+}
+.step-change:hover { border-color: var(--blue); }
+.opt-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+
+.search-wrap { position: relative; margin-bottom: 12px; }
+#search-input {
+  width: 100%; background: var(--panel); border: 1px solid var(--line); color: var(--text);
+  font-family: 'IBM Plex Mono', monospace; font-size: 13px; padding: 13px 15px; outline: none;
+}
+#search-input:focus { border-color: var(--blue); }
+.search-drop {
+  position: absolute; left: 0; right: 0; top: 100%; z-index: 8;
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--panel2);
+  box-shadow: 0 14px 40px rgba(0,0,0,0.55);
+}
+.search-drop .place { border: 1px solid var(--line); }
+.search-note { color: var(--dim); font-family: 'IBM Plex Mono', monospace; font-size: 12px; padding: 10px 12px; }
+
+.quick-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; }
+.qchip {
+  background: var(--panel); border: 1px solid var(--line); color: var(--text);
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.1em;
+  padding: 8px 13px;
+}
+.qchip:hover { border-color: var(--orange); color: var(--orange); }
+.qchip.surprise { border-color: var(--blue); color: var(--blue-soft); }
+
+.fleet-row {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
+  /* fills whatever the fixed card height allows; scrolls inside */
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 6px;
+  align-content: flex-start;
+  scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+}
+.fleet-row::-webkit-scrollbar { width: 6px; }
+.fleet-row::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+.fleet-row::-webkit-scrollbar-thumb:hover { background: var(--blue); }
+.fleet-card {
+  flex: 1; min-width: 150px;
+  background: var(--panel); border: 1px solid var(--line); color: var(--text);
+  padding: 14px 16px; text-align: left; display: flex; flex-direction: column; gap: 2px; border-radius: 10px;
+}
+.fleet-card:hover { border-color: var(--blue); }
+.fleet-card.sel { border-color: var(--blue); background: var(--panel2); box-shadow: 0 0 0 1px var(--blue), 0 8px 24px rgba(47,111,255,0.18); }
+.fleet-card .thumb {
+  width: 100%; aspect-ratio: 16/9; object-fit: contain;
+  background: radial-gradient(ellipse at 50% 60%, rgba(47,111,255,0.14), transparent 70%);
+  border-radius: 6px; margin-bottom: 6px; pointer-events: none;
+}
+.fleet-card .mfr { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.22em; color: var(--blue-soft); }
+.fleet-card .model { font-family: 'Anton', sans-serif; font-size: 22px; letter-spacing: 0.03em; }
+.fleet-card .role { font-size: 10px; color: var(--dim); letter-spacing: 0.14em; margin-top: 2px; }
+.fleet-card.fighter.sel { border-color: #ff8a3d; box-shadow: 0 0 0 1px #ff8a3d, 0 8px 24px rgba(255,138,61,0.22); }
+.fleet-card.fighter .mfr { color: #ff8a3d; }
+
+/* aircraft spec sheet — now an ⓘ popup over the card instead of a block
+   that made step 1 twice as tall as the others */
+.spec-sheet {
+  display: none; position: absolute; inset: 10px; z-index: 40;
+  background: rgba(7,12,23,0.97); border: 1px solid var(--blue);
+  border-radius: 12px; padding: 20px; overflow-y: auto;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.55);
+}
+.spec-sheet.open { display: block; animation: stepin 0.18s ease-out; }
+.spec-title { font-family: 'Anton', sans-serif; font-size: 24px; letter-spacing: 0.03em; margin-bottom: 2px; padding-right: 40px; }
+.spec-kicker { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.22em; color: var(--blue-soft); margin-bottom: 10px; }
+.spec-close {
+  position: absolute; top: 12px; right: 14px; width: 30px; height: 30px;
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--text); font-size: 14px; cursor: pointer;
+}
+.spec-close:hover { border-color: var(--blue); }
+.fleet-card { position: relative; }
+.fleet-info {
+  position: absolute; top: 8px; right: 8px; z-index: 2;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: rgba(10,18,32,0.85); border: 1px solid var(--line);
+  color: var(--blue-soft); font: 600 12px 'IBM Plex Mono', monospace;
+  cursor: pointer; line-height: 1;
+}
+.fleet-info:hover { border-color: var(--blue); color: #fff; }
+/* Release banner in the spec popup, above the description. The ⓘ button stays
+   live on a locked card on purpose, so this is where "you cannot fly this yet"
+   has to be said in words rather than implied by a greyed-out thumbnail. */
+.spec-release {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+  margin: 0 0 11px; padding: 9px 12px; border-radius: 8px;
+  background: rgba(70,16,12,0.34); border: 1px solid rgba(255,90,77,0.45);
+}
+.spec-release b {
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.14em; color: #ff6b5e; font-variant-numeric: tabular-nums;
+}
+.spec-release .sr-when {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  letter-spacing: 0.1em; color: var(--dim);
+}
+/* The spec popup is white glass in light mode, so the dark-theme treatment
+   composites to a washed-out mauve and --dim (a pale blue-grey meant for dark
+   panels) all but vanishes on it. Solid dark red on near-white instead. */
+body.theme-light .spec-release {
+  background: rgba(255,236,233,0.94); border-color: rgba(198,52,38,0.55);
+}
+body.theme-light .spec-release b { color: #b3261a; }
+body.theme-light .spec-release .sr-when { color: #7d4a43; }
+.spec-desc { font-size: 13px; color: var(--dim); line-height: 1.55; margin-bottom: 12px; }
+.spec-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.spec-cell {
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 11px; display: flex; flex-direction: column; gap: 2px;
+}
+.spec-cell label { font-family: 'IBM Plex Mono', monospace; font-size: 8px; letter-spacing: 0.2em; color: var(--blue-soft); }
+.spec-cell span { font-size: 13px; font-weight: 600; color: var(--text); }
+@media (max-width: 560px) { .spec-grid { grid-template-columns: 1fr 1fr; } }
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--blue), #5b8dff); color: #fff;
+  border: none; font-family: 'IBM Plex Mono', monospace; font-weight: 600;
+  font-size: 14px; letter-spacing: 0.14em; padding: 14px 24px;
+  box-shadow: 0 0 32px rgba(47,111,255,0.35);
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 42px rgba(47,111,255,0.55); }
+.btn-primary.big { width: 100%; font-size: 16px; padding: 17px 24px; }
+.btn-ghost {
+  background: none; border: 1px solid var(--line); color: var(--text);
+  font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.14em; padding: 14px 20px;
+}
+.btn-ghost:hover { border-color: var(--blue); color: var(--blue-soft); }
+
+.row-links { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.link-btn {
+  background: none; border: none; color: var(--dim);
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.16em;
+  padding: 6px 2px; border-bottom: 1px solid transparent;
+}
+.link-btn:hover { color: var(--orange); border-bottom-color: var(--orange); }
+.tod-mini { margin-left: auto; display: flex; gap: 5px; }
+
+/* the caption is a real sibling BELOW the square — reserving space inside
+   the square instead cropped the atmosphere glow in a straight dark line */
+.hero-globe {
+  justify-self: center; align-self: center; width: 100%;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.globe-square {
+  position: relative; aspect-ratio: 1; width: 100%;
+  max-width: min(910px, 88vh); max-height: min(88vh, 910px);
+}
+#globe-canvas { transition: opacity 0.15s linear; }
+.globe-label {
+  position: absolute; z-index: 4; pointer-events: none;
+  transform: translate(-50%, -140%) scale(0.9);
+  background: rgba(6,10,20,0.9); border: 1px solid var(--blue);
+  border-radius: 8px; padding: 5px 10px; white-space: nowrap;
+  opacity: 0; transition: opacity 0.16s ease, transform 0.16s ease;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+}
+.globe-label.show { opacity: 1; transform: translate(-50%, -150%) scale(1); }
+.globe-label .gl-name { font-weight: 700; font-size: 13px; color: #fff; }
+.globe-label .gl-region { display: block; font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.12em; color: var(--blue-soft); margin-top: 1px; }
+.globe-label::after {
+  content: ''; position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+  border: 5px solid transparent; border-top-color: var(--blue);
+}
+#globe-canvas { width: 100%; height: 100%; display: block; cursor: grab; }
+#globe-canvas:active { cursor: grabbing; }
+.globe-hint {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.2em; color: var(--dim);
+  white-space: nowrap; text-align: center;
+}
+
+.nav-links { display: flex; gap: 22px; margin-left: 26px; margin-right: auto; }
+.nav-links a {
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.22em;
+  color: var(--blue-soft); text-decoration: none; padding: 4px 0;
+  border-bottom: 1px solid transparent; transition: color 0.2s, border-color 0.2s;
+}
+.nav-links a:hover { color: var(--text); border-color: var(--blue); }
+.nav-burger {
+  display: none; background: none; border: 1px solid var(--line); border-radius: 8px;
+  color: var(--text); font-size: 17px; padding: 4px 11px; cursor: pointer;
+}
+@media (max-width: 860px) {
+  .nav-links {
+    display: none; position: absolute; top: 100%; left: 0; right: 0;
+    flex-direction: column; gap: 0; margin: 0;
+    background: rgba(5,8,15,0.97); border-bottom: 1px solid var(--line);
+    backdrop-filter: blur(10px);
+  }
+  .nav-links.open { display: flex; animation: navdrop 0.18s ease-out; }
+  .nav-links a { padding: 14px clamp(16px, 4vw, 44px); border-bottom: 1px solid var(--line); }
+  /* ONE row, always. wrap + two margin-left:auto children (the live counter
+     and the burger) used to stack the navbar three deep on a phone. */
+  .topnav { flex-wrap: nowrap; gap: 10px; padding-top: 10px; padding-bottom: 10px; }
+  .nav-brand { font-size: 18px; white-space: nowrap; }
+  .nav-live { margin-left: auto; font-size: 10px; white-space: nowrap; }
+  .nav-hot { display: none; }            /* hotspot line is far too long here */
+  .cs-wrap { display: none; }            /* same field lives in FLIGHT SETUP */
+  .nav-burger { display: block; margin-left: 0; flex: 0 0 auto; }
+}
+/* the globe caption carries the pilot count on phones (the navbar version is
+   hidden there) — a live number reads better than a mouse instruction on a
+   touch screen anyway */
+.gh-mobile { display: none; }
+.gh-mobile b { color: var(--text); }
+@media (max-width: 560px) {
+  .nav-brand { font-size: 16px; }
+  .nav-live { display: none; }           /* navbar = brand + burger only */
+  .nav-burger { margin-left: auto; }
+  .gh-desktop { display: none; }
+  .gh-mobile { display: inline; }
+}
+@keyframes navdrop { from { opacity: 0; transform: translateY(-6px); } }
+
+/* scroll-reveal for landing sections */
+.reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.55s ease, transform 0.55s ease; }
+.reveal.in { opacity: 1; transform: none; }
+
+.drawer-search { margin-bottom: 12px; }
+.drawer-search input {
+  width: 100%; background: var(--panel2); border: 1px solid var(--line); border-radius: 9px;
+  color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 13px;
+  padding: 12px 14px;
+}
+.drawer-search input:focus { outline: none; border-color: var(--blue); }
+
+/* settings dropdown (⚙ in the topbar) */
+/* SETTINGS was a top-right dropdown; it is now a centred modal in the shared
+   shell (.wm / .wm-box above) so it, CONTROLS and GRAPHICS are the same window
+   with different contents. Only its own row styling lives here now. */
+.wm-box .sp-row:first-child { padding-top: 10px; }
+.sp-row {
+  display: flex; align-items: center; gap: 10px; padding: 7px 0;
+}
+.sp-row + .sp-row { border-top: 1px solid rgba(28,42,68,0.6); }
+.sp-row label {
+  font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.22em;
+  color: var(--blue-soft); flex: 1;
+}
+.sp-toggle {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.1em;
+  color: var(--dim); cursor: pointer; border: 1px solid var(--line);
+  border-radius: 7px; padding: 4px 8px;
+}
+.sp-toggle:hover { border-color: var(--blue); color: var(--text); }
+/* captioned groups — the flat list of rows outgrew scannability */
+.sp-group {
+  border: 1px solid var(--line); border-radius: 10px;
+  padding: 0 12px 4px; margin: 10px 0;
+  background: rgba(12,20,36,0.35);
+}
+.sp-cap {
+  font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.26em;
+  color: var(--blue-soft); padding: 10px 0 3px; opacity: 0.85;
+}
+.sp-group .sp-row:first-of-type { border-top: 0; }
+/* a row whose control is owned by something else right now (custom time
+   while REAL TIME runs the clock) */
+.sp-row.disabled { opacity: 0.4; pointer-events: none; }
+#ctime-slider { width: 110px; accent-color: var(--blue); }
+.ctime-val {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.08em;
+  color: #dbe7ff; min-width: 40px; text-align: right; font-weight: 600;
+}
+/* GRAPHICS — the panel's headline action, so it is lifted out of the plain
+   label/toggle rhythm: its own tinted band, a brighter label, and a FILLED
+   button rather than an outlined one. Everything else here is a small
+   adjustment; this one opens a whole panel, and it was being read as just
+   another row. */
+.sp-row.sp-hero {
+  margin: -4px -14px 4px;           /* bleed to the panel edges */
+  padding: 9px 14px;
+  background: linear-gradient(90deg, rgba(47,111,255,0.16), rgba(47,111,255,0.05));
+  border-bottom: 1px solid rgba(47,111,255,0.35);
+}
+.sp-row.sp-hero + .sp-row { border-top: 0; }
+.sp-row.sp-hero label { color: #eaf1ff; font-size: 10px; font-weight: 600; }
+.tb-btn.sp-cta {
+  background: var(--blue); border-color: var(--blue); color: #fff;
+  font-weight: 600; padding: 6px 13px;
+  box-shadow: 0 2px 14px rgba(47,111,255,0.45);
+}
+.tb-btn.sp-cta:hover { filter: brightness(1.12); border-color: var(--blue); }
+#vol-slider, #eng-slider, #wxvol-slider {
+  width: 110px; accent-color: var(--blue);
+}
+/* #hud is a stacking context at z-index 20, so nothing inside it can ever
+   paint above .touch-ui (30) — the GEAR/FLAP stack sat on top of the panel no
+   matter what z-index the panel had. Lift the whole HUD for as long as the
+   modal is open; the backdrop inside it then covers the touch controls too. */
+body.is-touch #hud.settings-open { z-index: 55; }
+/* settings is a centred modal now — no edge offset needed */
+
+/* minimap: bottom-right corner during flight */
+#minimap-wrap {
+  position: fixed; right: 16px; bottom: 16px; z-index: 22;
+  display: none; flex-direction: column; align-items: center; gap: 6px;
+  pointer-events: auto; /* #hud is pointer-events:none — opt back in or clicks fall through to the sim */
+}
+#hud[data-map="on"] #minimap-wrap { display: flex; }
+#minimap {
+  width: 220px; height: 220px; border-radius: 50%;
+  background: rgba(8,13,24,0.7); cursor: pointer;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.45);
+}
+#minimap-info {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.1em;
+  color: var(--blue-soft); background: rgba(8,13,24,0.8);
+  border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px;
+  max-width: 250px; text-align: center;
+}
+body.is-touch #minimap { width: 128px; height: 128px; }
+body.is-touch #minimap-wrap { right: 8px; bottom: auto; top: 190px; }
+body.is-touch #minimap-info { font-size: 8px; max-width: 150px; padding: 3px 7px; }
+@media (orientation: landscape) and (max-height: 500px) {
+  /* phone held sideways: sit CLEANLY to the right of the instrument
+     cluster (PFD is centered at the top), not dead-center over the view */
+  body.is-touch #minimap-wrap { top: 32px; bottom: auto; right: auto; left: calc(50% + 88px); }
+  body.is-touch #minimap { width: 100px; height: 100px; }
+  body.is-touch #minimap-info { display: none; }
+}
+
+/* A HUD REPLACES THE PANEL, it does not sit on top of it.
+   With the fighter glass up, the PFD, the readout strip and the compass are
+   all showing figures the HUD is already carrying a foot higher up the
+   screen — two attitude indicators and two airspeeds at once. The minimap,
+   chat and objective bar stay: none of those are duplicated. */
+#hud.fhud #pfd, #hud.fhud #readouts, #hud.fhud #compass-wrap { display: none; }
+
+/* clean / minimal mode — fades instruments away smoothly (V or ◱ HIDE in
+   settings); map attribution stays, it is legally required */
+#pfd, #readouts, #compass-wrap, #minimap-wrap, #obj-bar, #chat, .dm-marker,
+.rudder-btns, .touch-btns > button { transition: opacity 0.35s ease; }
+#hud.clean #pfd, #hud.clean #readouts, #hud.clean #compass-wrap,
+#hud.clean #minimap-wrap, #hud.clean #obj-bar, #hud.clean #chat,
+#hud.clean .dm-marker, #hud.clean .dm-beam { opacity: 0; pointer-events: none !important; }
+/* touch minimal mode: rudder + action buttons fade too — stick, throttle
+   and pause stay so you can still fly */
+body.ui-min .rudder-btns { opacity: 0; pointer-events: none; }
+body.ui-min .touch-btns > button:not(#btn-pause-t) { opacity: 0; pointer-events: none; }
+
+/* MSFS-style floating destination marker projected into the world */
+.dm-marker {
+  position: fixed; z-index: 21; display: none;
+  transform: translate(-50%, -100%);
+  pointer-events: none; text-align: center;
+}
+.dm-label {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(8,13,24,0.82); border: 1px solid rgba(124,196,255,0.6);
+  border-radius: 10px; padding: 6px 12px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.08em;
+  color: #eef3fb; white-space: nowrap;
+  box-shadow: 0 6px 22px rgba(0,0,0,0.4);
+}
+.dm-label i { color: #7cc4ff; font-style: normal; opacity: 0.6; }
+.dm-label b { color: #7cc4ff; }
+.dm-pin { color: #7cc4ff; font-size: 18px; line-height: 1; margin-top: 2px; text-shadow: 0 0 10px rgba(124,196,255,0.9), 0 2px 8px rgba(0,0,0,0.6); }
+
+/* MSFS-style locator beam: a glowing vertical line from the ground up to the
+   marker, so you can pick the runway out of the terrain from miles away. Sized
+   and positioned in 3D by updateDestMarker (project the ground point and a
+   point above it, draw between them), so it foreshortens with distance like a
+   real beam of light rather than a fixed HUD element. */
+.dm-beam {
+  position: fixed; z-index: 20; display: none; pointer-events: none;
+  width: 3px;
+  /* anchored at its BOTTOM (the ground point) and rotated to point at the
+     marker, so it stays glued to the runway even when the aircraft banks —
+     a fixed vertical bar swam sideways under roll */
+  transform-origin: bottom center;
+  background: linear-gradient(to top,
+    rgba(124,196,255,0) 0%,
+    rgba(124,196,255,0.18) 12%,
+    rgba(150,210,255,0.9) 100%);
+  box-shadow: 0 0 12px rgba(124,196,255,0.6);
+  border-radius: 2px;
+}
+
+/* big planning map modal */
+#bigmap-modal {
+  position: fixed; inset: 0; z-index: 70; display: none;
+  align-items: center; justify-content: center;
+  background: rgba(4,7,13,0.8); backdrop-filter: blur(4px);
+}
+.bm-box {
+  background: var(--panel); border: 1px solid var(--blue); border-radius: 16px;
+  padding: 14px; width: min(1060px, 96vw);
+  box-shadow: 0 24px 90px rgba(47,111,255,0.25);
+}
+.bm-head { display: flex; gap: 8px; margin-bottom: 10px; }
+#bm-search {
+  flex: 1; background: var(--panel2); border: 1px solid var(--line); border-radius: 9px;
+  color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 13px;
+  padding: 10px 14px; min-width: 0;
+}
+#bm-search:focus { outline: none; border-color: var(--blue); }
+#bm-results { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+#bm-results:empty { display: none; }
+#bm-results .chip { font-size: 11px; }
+#bigmap {
+  width: 100%; border-radius: 10px; cursor: crosshair; display: block;
+  background: #0a1220; touch-action: none;
+}
+.bm-hint {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em;
+  color: var(--dim); text-align: center; margin-top: 9px;
+}
+.bm-you { color: #ffffff; }
+.bm-peer { color: #59e08b; }
+.bm-tfc { color: #ffb454; }
+#bm-tip {
+  position: fixed; z-index: 75; display: none; pointer-events: none;
+  background: rgba(9,15,27,0.95); border: 1px solid rgba(255,180,84,0.6);
+  border-radius: 8px; padding: 6px 10px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.08em;
+  color: #ffd28a; white-space: nowrap;
+}
+
+/* flight detail card — anchored INSIDE the map, slides in from the right */
+.bm-box { position: relative; }
+#bm-flight {
+  position: absolute; top: 78px; right: 30px; z-index: 76; display: none;
+  width: min(252px, 68vw); background: rgba(9,15,27,0.94);
+  border: 1px solid rgba(255,180,84,0.55); border-radius: 14px;
+  padding: 14px 16px; box-shadow: 0 14px 44px rgba(0,0,0,0.55);
+  backdrop-filter: blur(8px);
+}
+#bm-flight.open { display: block; animation: bmfin 0.22s cubic-bezier(0.2, 0.9, 0.3, 1); }
+@keyframes bmfin { from { opacity: 0; transform: translateX(18px) scale(0.97); } }
+#bmf-close {
+  position: absolute; top: 8px; right: 10px; background: none; border: none;
+  color: var(--dim); font-size: 14px; cursor: pointer;
+}
+#bmf-close:hover { color: var(--text); }
+#bmf-cs { font-family: 'Anton', sans-serif; font-size: 24px; letter-spacing: 0.03em; color: #ffd28a; }
+#bmf-airline { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--dim); margin: 2px 0 12px; letter-spacing: 0.08em; }
+.bmf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 12px; }
+.bmf-grid label {
+  display: block; font-family: 'IBM Plex Mono', monospace; font-size: 8px;
+  letter-spacing: 0.24em; color: var(--blue-soft); margin-bottom: 2px;
+}
+.bmf-grid b { font-size: 13px; font-family: 'IBM Plex Mono', monospace; color: var(--text); font-weight: 500; }
+.bmf-note { margin-top: 12px; font-size: 9px; color: var(--dim); font-family: 'IBM Plex Mono', monospace; line-height: 1.5; }
+@media (max-height: 760px) { #bigmap { height: min(52vh, 620px); object-fit: cover; } }
+
+/* ======================= ATC PANEL =======================
+   Mid-left: the one large piece of free screen (compass top-left, chat
+   bottom-left, instruments centre, minimap right). Minimal on purpose —
+   a thin card, one accent rule, real typographic hierarchy between the
+   radio call and its translation. No gradients, no glass. */
+#atc {
+  position: fixed; left: 20px; top: 50%; transform: translateY(-50%);
+  z-index: 44; width: 322px; pointer-events: auto;   /* #hud is none */
+  background: rgba(7,12,22,0.94);
+  border: 1px solid var(--line); border-left: 2px solid var(--blue);
+  border-radius: 4px;
+  animation: atcIn 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes atcIn { from { opacity: 0; transform: translateY(-50%) translateX(-10px) scale(var(--hud-s, 1)); } }
+#atc.speaking { border-left-color: #3ddc84; }
+.atc-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 11px; border-bottom: 1px solid rgba(28,42,68,0.7);
+}
+.atc-dot {
+  width: 5px; height: 5px; border-radius: 50%; background: var(--dim);
+  flex-shrink: 0; transition: background 0.2s;
+}
+#atc.speaking .atc-dot { background: #3ddc84; box-shadow: 0 0 8px rgba(61,220,132,0.9); }
+.atc-head b {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.2em;
+  color: #eaf1ff; font-weight: 600; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; flex: 1;
+}
+.atc-head span {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.08em;
+  color: var(--blue-soft); flex-shrink: 0;
+}
+/* A LABELLED control, not a lone "–". The dash was unreadable as a button:
+   people could not tell it collapsed the panel, and once collapsed there was
+   nothing saying how to get back. Now it says HIDE, and when collapsed the
+   whole header becomes an obvious SHOW ATC bar. */
+#atc-min {
+  display: flex; align-items: center; gap: 5px; flex-shrink: 0; cursor: pointer;
+  background: rgba(110,168,255,0.10); border: 1px solid var(--line);
+  border-radius: 3px; padding: 3px 7px; color: var(--blue-soft);
+  font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.16em;
+}
+#atc-min em { font-style: normal; font-size: 8px; }
+#atc-min:hover { border-color: var(--blue); background: rgba(47,111,255,0.22); color: #fff; }
+#atc.collapsed #atc-min em { transform: rotate(180deg); display: inline-block; }
+#atc.collapsed #atc-min span::after { content: ' ATC'; }
+.atc-lbl {
+  font-family: 'IBM Plex Mono', monospace; font-size: 8px; letter-spacing: 0.2em;
+  color: var(--dim); border: 1px solid var(--line); border-radius: 2px;
+  padding: 2px 4px; flex-shrink: 0;
+}
+.atc-body { padding: 11px; }
+#atc.collapsed .atc-body, #atc.collapsed .atc-task { display: none; }
+#atc.collapsed { cursor: pointer; }
+/* CALL — the other half of a radio: you can always ask, not just be told. */
+.atc-call {
+  display: flex; align-items: center; gap: 7px; width: 100%; margin-top: 11px;
+  background: rgba(61,220,132,0.08); border: 1px solid rgba(61,220,132,0.3);
+  border-radius: 3px; padding: 8px 10px; cursor: pointer; color: #cdf3dd;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em;
+  transition: background 0.14s, border-color 0.14s;
+}
+.atc-call:hover { background: rgba(61,220,132,0.2); border-color: #3ddc84; color: #fff; }
+.atc-call span { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.atc-call kbd {
+  font-family: inherit; font-size: 8.5px; color: #8fe3b0;
+  border: 1px solid rgba(61,220,132,0.35); border-radius: 2px; padding: 1px 5px;
+}
+.atc-opts:not(:empty) + .atc-call { display: none; }   /* mid-exchange: reply first */
+/* THE RADIO CALL — real phraseology, monospace, the loudest thing here */
+.atc-radio {
+  font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; line-height: 1.55;
+  color: #eaf1ff; letter-spacing: 0.01em;
+}
+/* WHAT IT MEANS — sans, dim, one step down. The whole accessibility idea. */
+.atc-plain {
+  font-size: 12.5px; line-height: 1.5; color: var(--dim);
+  margin-top: 7px; padding-top: 7px; border-top: 1px dashed rgba(40,58,90,0.6);
+}
+.atc-opts { display: flex; flex-direction: column; gap: 6px; margin-top: 11px; }
+.atc-opts:empty { display: none; }
+.atc-opt {
+  display: flex; align-items: baseline; gap: 9px; width: 100%; text-align: left;
+  background: rgba(47,111,255,0.09); border: 1px solid rgba(47,111,255,0.34);
+  border-radius: 3px; padding: 8px 10px; cursor: pointer; color: var(--text);
+  transition: background 0.14s, border-color 0.14s;
+}
+.atc-opt:hover { background: rgba(47,111,255,0.2); border-color: var(--blue); }
+.atc-opt kbd {
+  font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--blue-soft);
+  border: 1px solid rgba(47,111,255,0.4); border-radius: 2px; padding: 1px 5px;
+  flex-shrink: 0;
+}
+.atc-opt b { font-size: 12.5px; font-weight: 600; color: #eaf1ff; display: block; }
+.atc-opt i { font-style: normal; font-size: 11px; color: var(--dim); display: block; margin-top: 2px; }
+/* THE OBJECTIVE — the single thing ATC wants from you right now */
+.atc-task {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 11px; border-top: 1px solid rgba(28,42,68,0.7);
+  background: rgba(47,111,255,0.07);
+  font-family: 'IBM Plex Mono', monospace; font-size: 10.5px;
+  letter-spacing: 0.1em; color: #cfe0ff;
+}
+.atc-task i { font-style: normal; color: var(--blue); }
+.atc-task:has(span:empty) { display: none; }
+/* PHONES: the throttle lever owns the left edge, so sit under the topbar,
+   narrower, and start collapsed to a single line the player can open.
+
+   THE PANEL MUST NEVER REACH THE FLIGHT CONTROLS. Measured on a 390x844
+   phone the open radio menu was 692px tall — 82% of the screen — and its
+   box covered the joystick, both rudder buttons and GEAR/FLAP/CAM. The
+   aircraft was literally unflyable while the radio was open, because the
+   panel is pointer-events:auto and swallowed every touch. It is now a
+   height-capped card whose MIDDLE scrolls: the header (station, OFF, HIDE)
+   stays pinned at the top and the objective line stays pinned at the
+   bottom, so the two things you always need are never scrolled away. */
+body.is-touch #atc {
+  left: 8px; top: 62px; transform: none; width: min(280px, calc(100vw - 150px));
+  animation: none;
+  display: flex; flex-direction: column;
+  max-height: 46vh;                  /* ends far above the stick on any phone */
+}
+body.is-touch .atc-head, body.is-touch .atc-task { flex-shrink: 0; }
+body.is-touch .atc-body {
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  min-height: 0;                     /* or flex refuses to shrink it */
+  overscroll-behavior: contain;      /* never scroll the page behind it */
+  /* the scroller must ANNOUNCE itself: a capped panel that silently hides
+     half its options reads as missing features, not as a scroll area */
+  scrollbar-width: thin; scrollbar-color: rgba(110,168,255,0.5) transparent;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 14px), transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 calc(100% - 14px), transparent 100%);
+}
+body.is-touch .atc-body::-webkit-scrollbar { width: 4px; }
+body.is-touch .atc-body::-webkit-scrollbar-thumb {
+  background: rgba(110,168,255,0.5); border-radius: 3px;
+}
+body.is-touch .atc-radio, body.is-touch .atc-plain { font-size: 11.5px; }
+/* tighter option rows: the two-line chips are the height hog, and the
+   plain-English second line is the whole point of the system, so it is
+   compressed rather than dropped */
+body.is-touch .atc-opt { padding: 7px 9px; }
+body.is-touch .atc-opt b { font-size: 12px; }
+body.is-touch .atc-opt i { font-size: 10.5px; line-height: 1.25; margin-top: 1px; }
+body.is-touch .atc-opts { gap: 5px; margin-top: 9px; }
+/* collapsed is a single bar again — no cap, no scroller */
+body.is-touch #atc.collapsed { max-height: none; }
+
+@media (orientation: landscape) and (max-height: 500px) {
+  /* LANDSCAPE PHONES: ~390px of height for everything, and the left edge is
+     owned by the rudder buttons (y≈183) and the stick below them. A tall
+     narrow panel cannot exist here without covering both, so it turns on its
+     side: WIDER (out to the PFD, never past it) and SHORT enough to stop
+     above the rudder, with the options in two columns so eight of them still
+     fit in four rows instead of eight. */
+  body.is-touch #atc {
+    top: 44px; left: 8px;
+    width: min(320px, 38vw);
+    max-height: calc(100vh - 259px);   /* stops ~9px above the rudder row */
+  }
+  body.is-touch .atc-plain { display: none; }   /* no room; radio call only */
+  body.is-touch .atc-opt i { display: none; }   /* titles only down here */
+  body.is-touch .atc-opt { padding: 6px 9px; align-items: center; }
+  body.is-touch .atc-opt b { font-size: 11px; }
+  /* two-up option grid — the whole reason the panel is wide down here */
+  body.is-touch .atc-opts { flex-direction: row; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+  body.is-touch .atc-opts > * { flex: 1 1 calc(50% - 3px); min-width: 0; }
+  /* every pixel of chrome here costs a row of options, so the header, the
+     transmission line and the objective all run tight */
+  body.is-touch .atc-body { padding: 7px 8px; }
+  body.is-touch .atc-head { padding: 5px 8px; gap: 5px; }
+  body.is-touch .atc-head b { font-size: 9px; }
+  body.is-touch #atc-freq { display: none; }
+  body.is-touch #atc-off, body.is-touch #atc-min { padding: 5px 8px; font-size: 9px; }
+  body.is-touch .atc-radio { font-size: 10.5px; line-height: 1.3; }
+  body.is-touch .atc-task { padding: 4px 8px; font-size: 9px; }
+}
+
+/* SETTINGS ON A LANDSCAPE PHONE. The modal is 560px wide and 343px tall, and
+   it was pouring a single 816px column through a 293px window: 2.8 screens of
+   scrolling to reach the bottom, with half the box empty on the right. The
+   captioned groups become a two-column grid, which is what the width was
+   there for. Portrait is untouched — one column is correct there. */
+@media (orientation: landscape) and (max-height: 560px) {
+  body.is-touch .wm-body {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 0 14px; align-content: start;
+  }
+  body.is-touch .wm-body > .sp-group { margin: 8px 0; break-inside: avoid; }
+  /* full-width items: the headline action and anything not in a group */
+  body.is-touch .wm-body > .sp-row { grid-column: 1 / -1; }
+  body.is-touch .sp-group .sp-row { padding: 7px 0; }
+  body.is-touch .sp-cap { padding: 8px 0 2px; }
+}
+
+/* WORLD DETAIL picker — flight-start choice, mid-left, computers only */
+#worldmode {
+  position: fixed; left: 22px; top: 50%; transform: translateY(-50%);
+  z-index: 45; width: 300px;
+  /* it lives inside #hud, which is pointer-events:none so drags reach the
+     camera — without this the whole picker is a ghost nobody can click */
+  pointer-events: auto;
+  background: rgba(9,15,27,0.96); border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px; box-shadow: 0 22px 60px rgba(0,0,0,0.55);
+  animation: wmrise 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.wmode-cap {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.26em;
+  color: var(--blue-soft); margin: 2px 2px 10px;
+}
+.wmode-opt {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  background: rgba(12,20,36,0.6); border: 1px solid var(--line); border-radius: 11px;
+  padding: 11px 12px; margin-top: 8px; color: var(--text);
+}
+.wmode-opt:first-of-type { margin-top: 0; }
+.wmode-opt:hover { border-color: var(--blue); background: rgba(47,111,255,0.12); }
+.wmode-opt.sel { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue) inset; }
+.wmode-opt b {
+  display: block; font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+  letter-spacing: 0.1em; color: #eaf1ff; font-weight: 600;
+}
+.wmode-opt small { display: block; margin-top: 4px; font-size: 11.5px; line-height: 1.45; color: var(--dim); }
+.wmode-tag {
+  display: inline-block; margin-left: 7px; font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px; letter-spacing: 0.16em; border: 1px solid; border-radius: 999px;
+  padding: 2px 7px; vertical-align: 2px;
+}
+.wmode-tag.rec { color: #8fe3b0; border-color: rgba(70,200,130,0.5); }
+.wmode-tag.hi { color: #ffd34d; border-color: rgba(255,211,77,0.45); }
+
+/* "fly your city" suggestion chip — first in the quick picks */
+.chip.local {
+  border-color: rgba(89,224,139,0.55);
+  background: linear-gradient(100deg, rgba(89,224,139,0.16), transparent 70%);
+  color: #d9ffe8;
+}
+.chip.local:hover { border-color: #59e08b; }
+
+/* FLY WITH A FRIEND block on the destination step */
+.friend-wrap {
+  background: linear-gradient(100deg, rgba(47,111,255,0.10), var(--panel2) 70%);
+  border: 1px solid rgba(47,111,255,0.4); border-radius: 12px;
+  padding: 12px 14px; margin: 12px 0 4px;
+}
+.friend-label {
+  font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.28em;
+  color: var(--blue-soft); margin-bottom: 8px;
+}
+.friend-row { display: flex; gap: 8px; }
+.friend-row input {
+  flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 13px;
+  letter-spacing: 0.14em; text-transform: uppercase; padding: 10px 12px; min-width: 0;
+}
+.friend-row input:focus { outline: none; border-color: var(--blue); }
+.friend-btn { white-space: nowrap; }
+.friend-status { font-size: 11px; color: var(--dim); margin-top: 8px; line-height: 1.5; }
+.friend-status.found { color: #59e08b; }
+.friend-status.miss { color: #e0a659; }
+
+/* pilots-online search result */
+.place.pilot { border-color: rgba(47,111,255,0.55); background: linear-gradient(100deg, rgba(47,111,255,0.16), transparent 65%); }
+.place.pilot .p-code { color: #59e08b; }
+
+/* big callsign field on the flight setup card */
+.cs2-input {
+  width: 100%; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 15px;
+  letter-spacing: 0.18em; text-transform: uppercase; padding: 10px 13px;
+}
+.cs2-input:focus { outline: none; border-color: var(--blue); }
+
+/* Full-bleed gameplay band. A real screenshot doing the selling, with the
+   copy sitting in a scrim over the darkest corner rather than a soft blur
+   across the whole thing — the terrain stays legible, which is the point. */
+.shot-band {
+  position: relative;
+  isolation: isolate;
+  min-height: clamp(300px, 44vw, 600px);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  /* Contained and centred rather than bleeding to the edges: full bleed pulled
+     against a page that is centred everywhere else, and on a wide monitor it
+     stretched into a letterbox nothing could fill well.
+
+     920 rather than the nominal 1180, because every section here uses
+     `margin: 0 auto` inside a flex column, and an auto margin makes a flex
+     item shrink-to-fit instead of stretching — so the feature grid actually
+     renders about 874 wide and the prose block 900, never their max-width.
+     Matching what they really are is what makes the column read as one. */
+  width: calc(100% - clamp(32px, 8vw, 88px));
+  max-width: 920px;
+  margin: clamp(24px, 5vw, 64px) auto 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.shot-img {
+  position: absolute; inset: 0; z-index: -2;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  /* Crop left-of-centre so the aircraft sits in the RIGHT half, clear of the
+     copy, and bias downward so the band is canyon rather than empty sky. */
+  object-position: 38% 64%;
+}
+.shot-band::after {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background:
+    linear-gradient(to top, rgba(4,7,13,0.94) 0%, rgba(4,7,13,0.60) 32%, rgba(4,7,13,0) 60%),
+    linear-gradient(to right, rgba(4,7,13,0.78) 0%, rgba(4,7,13,0.10) 52%, rgba(4,7,13,0) 100%);
+}
+.shot-copy {
+  position: relative;
+  max-width: 640px;
+  padding: clamp(22px, 4vw, 52px);
+}
+.shot-title {
+  font-family: 'Anton', sans-serif;
+  font-size: clamp(32px, 5.2vw, 62px);
+  line-height: 1.02; letter-spacing: 0.01em; margin-bottom: 12px;
+  text-shadow: 0 2px 24px rgba(4,7,13,0.7);
+}
+.shot-title .o { color: var(--blue); }
+.shot-sub {
+  color: var(--dim); font-size: clamp(14px, 1.5vw, 17px); line-height: 1.55;
+  max-width: 46ch; text-shadow: 0 1px 12px rgba(4,7,13,0.8);
+}
+@media (max-width: 640px) {
+  /* Phones keep the overlay, just shorter and cropped tighter on the aircraft
+     so it is not a sliver of fuselage. */
+  .shot-band { min-height: clamp(300px, 78vw, 420px); }
+  .shot-img { object-position: 48% 52%; }
+  .shot-band::after {
+    background: linear-gradient(to top,
+      rgba(4,7,13,0.95) 0%, rgba(4,7,13,0.72) 38%, rgba(4,7,13,0.10) 70%, rgba(4,7,13,0) 100%);
+  }
+  .shot-copy { padding: 20px 18px 24px; max-width: none; }
+}
+
+/* The card is a fixed, centred width now, so the picture never has to fill an
+   extreme letterbox and the overlay works at every size — no split needed. */
+@media (min-width: 641px) {
+  .shot-band { min-height: clamp(360px, 34vw, 470px); }
+  .shot-copy { padding: clamp(26px, 3.2vw, 46px); }
+}
+
+/* Feature showcase — bold cards selling what the game does */
+.features {
+  max-width: 1180px; margin: 0 auto;
+  padding: clamp(30px, 6vw, 80px) clamp(16px, 4vw, 44px) 30px;
+}
+.feat-kicker {
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  letter-spacing: 0.32em; color: var(--blue-soft); margin-bottom: 10px;
+}
+.feat-title {
+  font-family: 'Anton', sans-serif; font-size: clamp(34px, 5.5vw, 64px);
+  line-height: 1.02; letter-spacing: 0.01em; margin-bottom: clamp(24px, 4vw, 44px);
+}
+.feat-title .o { color: var(--blue); }
+.feat-grid {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+.feat-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 22px 24px 20px;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.feat-card:hover { border-color: var(--blue); transform: translateY(-3px); }
+.feat-card.wide { grid-column: 1 / -1; background: linear-gradient(120deg, rgba(47,111,255,0.14), var(--panel) 55%); border-color: rgba(47,111,255,0.45); }
+.fc-kicker {
+  font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+  letter-spacing: 0.28em; color: var(--blue-soft); margin-bottom: 8px;
+}
+.fc-title { font-family: 'Anton', sans-serif; font-size: clamp(20px, 2.4vw, 28px); letter-spacing: 0.02em; margin-bottom: 8px; }
+.feat-card p { font-size: 13.5px; line-height: 1.65; color: var(--dim); }
+.feat-card.wide p { max-width: 640px; font-size: 14.5px; }
+
+/* SEO content — real crawlable copy, sits below the one-screen hero */
+.seo {
+  max-width: 900px; margin: 0 auto; padding: 10px clamp(16px, 4vw, 44px) 40px;
+  color: var(--dim);
+}
+.seo h2 { font-family: 'Anton', sans-serif; font-size: clamp(24px, 3.4vw, 38px); color: var(--text); letter-spacing: 0.01em; margin-bottom: 14px; }
+.seo h3 { font-size: 16px; color: var(--blue-soft); margin: 24px 0 8px; letter-spacing: 0.02em; }
+.seo p { font-size: 14px; line-height: 1.7; margin-bottom: 10px; }
+.seo ul { list-style: none; display: grid; gap: 8px; margin-top: 8px; }
+.seo li { font-size: 14px; line-height: 1.5; padding-left: 24px; position: relative; }
+.seo li::before { content: '✈'; position: absolute; left: 0; color: var(--blue); transform: rotate(-45deg); }
+
+.menu-foot {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 12px clamp(16px, 4vw, 44px); border-top: 1px solid var(--line);
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--dim); letter-spacing: 0.04em;
+}
+.gkey-wrap { display: flex; align-items: center; gap: 6px; }
+.gkey-wrap input {
+  background: var(--panel); border: 1px solid var(--line); color: var(--text);
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 5px 8px; width: 250px; outline: none;
+}
+.gkey-wrap input:focus { border-color: var(--blue); }
+#gkey-status { color: var(--blue-soft); }
+
+/* ============================= DRAWER ============================= */
+#drawer {
+  position: fixed; inset: 0; z-index: 52; display: none;
+  align-items: stretch; justify-content: flex-end;
+  background: rgba(4,7,13,0.6);
+}
+.drawer-box {
+  width: min(680px, 94vw); background: var(--panel);
+  border-left: 1px solid var(--orange);
+  padding: 20px 22px; overflow-y: auto;
+  animation: slidein 0.22s ease-out;
+}
+@keyframes slidein { from { transform: translateX(40px); opacity: 0; } }
+.drawer-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--line);
+  font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.24em; color: var(--orange);
+}
+.drawer-pane { display: none; }
+.drawer-pane.sel { display: block; }
+.drawer-pane h4 {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.24em;
+  color: var(--blue-soft); margin: 14px 0 8px;
+}
+.drawer-pane h4:first-child { margin-top: 0; }
+
+.place-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 7px; }
+.place {
+  background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+  padding: 10px 12px; text-align: left; display: flex; flex-direction: column; gap: 1px;
+  transition: border-color 0.15s;
+}
+.place:hover { border-color: var(--orange); }
+.p-code { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--orange); letter-spacing: 0.2em; }
+.p-name { font-weight: 600; font-size: 13px; }
+.p-region { font-size: 11px; color: var(--dim); }
+
+.chip {
+  background: none; border: 1px solid var(--line); color: var(--dim);
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.15em; padding: 6px 11px;
+}
+.chip:hover { border-color: var(--orange); color: var(--orange); }
+.chip.sel { background: var(--blue); color: #fff; border-color: var(--blue); font-weight: 600; }
+
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.mcard {
+  background: var(--panel2); border: 1px solid var(--line);
+  padding: 16px; text-align: left; color: var(--text);
+  display: flex; flex-direction: column; gap: 7px; position: relative;
+  transition: border-color 0.15s, transform 0.12s;
+}
+.mcard:hover { border-color: var(--orange); transform: translateY(-2px); }
+.mcard .m-diff {
+  position: absolute; top: 12px; right: 12px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.2em;
+  color: var(--blue-soft); border: 1px solid var(--line); padding: 3px 7px;
+}
+.mcard .m-title { font-family: 'Anton', sans-serif; font-size: 21px; letter-spacing: 0.02em; }
+.mcard .m-place { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.16em; color: var(--orange); }
+.mcard .m-desc { font-size: 12.5px; color: var(--dim); line-height: 1.5; flex: 1; }
+.mcard .m-stars { font-size: 14px; letter-spacing: 0.2em; color: var(--orange); min-height: 18px; }
+
+/* ============================= WEATHER ROW ============================= */
+.wx-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+
+/* ============================= CHAT ============================= */
+#chat {
+  position: fixed; left: 12px; bottom: 12px; z-index: 26;
+  display: none; flex-direction: column; gap: 6px;
+  width: min(320px, 78vw); pointer-events: auto;
+}
+#chat-log {
+  max-height: 170px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 3px;
+  scrollbar-width: thin;
+}
+.chat-msg {
+  background: rgba(6,10,20,0.62); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px; padding: 4px 9px;
+  font-size: 12px; line-height: 1.4; color: var(--text);
+  word-break: break-word;
+}
+.chat-msg b { color: var(--blue-soft); font-family: 'IBM Plex Mono', monospace; font-size: 10px; margin-right: 7px; letter-spacing: 0.08em; }
+.chat-msg.self b { color: var(--ok); }
+/* your own line while the relay's AI check runs (about a second) */
+.chat-msg.pending { opacity: 0.5; }
+/* a note from the game to you alone: line refused, muted, callsign replaced */
+.chat-msg.sys {
+  background: rgba(48,32,6,0.72); border-color: rgba(255,190,90,0.35);
+  color: #ffd79a; font-size: 11.5px;
+}
+body.is-touch .chat-msg.sys { background: rgba(48,32,6,0.55); border: none; color: #ffd08a; }
+/* ============================ PORTAL MODE ==================================
+   Applied by js/main.js when the page is opened with ?portal=1, which is the
+   URL handed to a game portal. Nothing here is reachable otherwise.
+
+   SEO: this is a runtime class on the SAME url. A crawler fetching "/" without
+   the parameter receives byte-identical HTML to before, and the canonical tag
+   already points every variant at "/", so there is no second page to index and
+   nothing to split ranking between. The parameter is not linked from anywhere
+   on the site, and robots.txt disallows it as a belt-and-braces measure.
+
+   WHAT IT REMOVES. Portals want a game, not a website, and most forbid a game
+   navigating the player away from itself. So: the nav links, the Discord card,
+   the marketing hero copy, the feature and SEO sections and the footer all go.
+   What is left is the aircraft grid, FLY NOW and the globe. */
+body.portal .nav-links,
+body.portal .hero-discord,
+body.portal .daystrip,
+body.portal .shot-band,
+body.portal #features,
+body.portal .seo,
+body.portal .menu-foot,
+body.portal .plate,
+body.portal #nav-burger { display: none !important; }
+
+/* An embed is a fixed frame, so the game has to fit it rather than scroll
+   inside it. Everything below the fold is site content and is gone above, so
+   what remains is the card and the globe. */
+body.portal #landing { height: 100vh; min-height: 0; overflow: hidden; }
+body.portal .hero-simple { min-height: 0; }
+
+/* The headline is marketing, not game. Drop it and let the card come up to
+   meet the top of the frame, which is usually short in an embed. */
+body.portal .hero-simple h1,
+body.portal .hero-sub { display: none; }
+body.portal .hero-simple { padding-top: 14px; }
+body.portal #landing { min-height: 100vh; }
+
+/* The brand stays as a label, but must not be a way out of the frame. */
+body.portal .nav-brand { pointer-events: none; }
+
+/* Quick start. Both actions live under the fleet grid: pick a plane, then
+   choose how you leave. FLY NOW is the loud one because a first-time visitor
+   has no basis yet for planning a route, but the alternative is a full-width
+   button with a label that says what it does, not a bare "continue". */
+/* [hidden] is only display:none in the UA sheet, so an author rule with
+   display:flex silently beats it -- with QUICKSTART off the button would still
+   be on screen, and dead, because no listener is attached. */
+.flynow[hidden] { display: none; }
+.flynow {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  width: 100%; margin: 0 0 9px; padding: 13px 18px; line-height: 1.25;
+}
+.flynow b { font-size: 15px; letter-spacing: 2px; }
+.flynow small { font-size: 10.5px; letter-spacing: 0.6px; opacity: 0.75; font-weight: 400; }
+/* Quieter, but still a real button — this is the only route to a chosen
+   destination and it must not read as a dismissable link. */
+.btn-primary.btn-alt {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--blue-soft);
+}
+.btn-primary.btn-alt:hover {
+  background: rgba(47,111,255,0.10);
+  border-color: var(--blue);
+  color: #fff;
+}
+/* Operator only: a chat callsign you can tap to point OPS at its author.
+   Deliberately quiet — it sits in the flight HUD, and only operators ever
+   see the affordance at all. Touch gets a bigger hit area. */
+.chat-msg b.chat-pick {
+}  cursor: pointer;
+  border-bottom: 1px dotted currentColor;
+  pointer-events: auto;
+}
+.chat-msg b.chat-pick:hover { color: #fff; }
+body.is-touch .chat-msg b.chat-pick { padding: 2px 4px; margin: -2px 3px -2px -4px; }
+/* Report flag on a chat line. Stays out of the way until you go looking for
+   it — the chat sits over the flight HUD, and a row of loud buttons there
+   would be worse than the problem it solves. Touch always shows it, because
+   there is no hover to reveal it with. */
+.chat-msg .chat-flag {
+  background: none; border: 0; padding: 0 2px; margin-left: 6px; cursor: pointer;
+  color: var(--dim); font-size: 11px; line-height: 1; opacity: 0;
+  transition: opacity 0.12s, color 0.12s; pointer-events: auto;
+}
+.chat-msg:hover .chat-flag, .chat-msg .chat-flag:focus-visible { opacity: 0.65; }
+.chat-msg .chat-flag:hover { color: var(--warn); opacity: 1; }
+.chat-msg .chat-flag.done { opacity: 1; color: var(--warn); cursor: default; }
+body.is-touch .chat-msg .chat-flag { opacity: 0.5; padding: 3px 6px; margin-left: 4px; }
+/* operator broadcast — impossible to miss, and impossible to fake: the
+   relay is the only sender allowed to use the ★ADMIN callsign */
+.chat-msg.admin {
+  background: rgba(60,8,12,0.82); border-color: #ff3b46;
+  box-shadow: 0 0 0 1px rgba(255,59,70,0.35), 0 4px 18px rgba(255,59,70,0.18);
+  animation: adminIn 0.3s ease-out;
+}
+.chat-msg.admin b { color: #ff5a63; font-weight: 700; letter-spacing: 0.14em; }
+/* operator shield, sized to the cap height of the callsign next to it */
+.chat-badge { width: 12px; height: 12px; vertical-align: -2px; margin-right: 5px; }
+.chat-msg.admin span { color: #ffe6e8; font-weight: 600; }
+@keyframes adminIn { from { transform: translateX(-8px); opacity: 0; } }
+body.is-touch .chat-msg.admin { background: rgba(60,8,12,0.75); border: 1px solid #ff3b46; padding: 3px 6px; }
+#chat-row { display: flex; gap: 6px; }
+#chat-input {
+  flex: 1; background: rgba(6,10,20,0.75); border: 1px solid rgba(255,255,255,0.14); color: var(--text);
+  border-radius: 8px; padding: 8px 11px; font-size: 12px; outline: none; font-family: 'Inter', sans-serif;
+}
+#chat-input:focus { border-color: var(--blue); }
+#chat-send {
+  background: var(--blue); border: none; color: #fff; border-radius: 8px; padding: 0 13px; font-size: 13px;
+}
+
+/* mobile chat: compact Roblox-style box in the top-left corner — one
+   contained translucent panel, plain message lines, input inside. Top
+   placement keeps it clear of the on-screen keyboard; 16px input font
+   stops iOS's zoom-on-focus jump. */
+body.is-touch #chat {
+  left: 8px; right: auto; top: 42px; bottom: auto;
+  width: min(280px, 62vw); z-index: 40;
+  background: rgba(6,10,20,0.55);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 6px;
+  backdrop-filter: blur(4px);
+  gap: 4px;
+}
+/* FIXED height ≈ 4 message lines — the box never grows with traffic,
+   older messages scroll */
+body.is-touch #chat-log { height: 76px; max-height: none; }
+body.is-touch .chat-msg { font-size: 11px; padding: 2px 5px; background: transparent; border: none; }
+body.is-touch #chat-input { font-size: 16px; padding: 6px 10px; background: rgba(255,255,255,0.06); min-width: 0; }
+body.is-touch #chat-send { min-width: 0; min-height: 0; padding: 0 8px; font-size: 11px; border-radius: 6px; flex: 0 0 auto; }
+
+/* ============================= ACCOUNTS ============================= */
+/* While the relay locks chat to accounts, the input row gives way to one
+   button. A class on #chat rather than [hidden], because #chat-row's own
+   display:flex would beat the hidden attribute. */
+#chat-gate { display: none; }
+#chat.gated #chat-row { display: none; }
+#chat.gated #chat-gate { display: block; }
+#chat-gate {
+  width: 100%; background: var(--blue); border: none; color: #fff; border-radius: 8px;
+  padding: 9px 12px; font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  letter-spacing: 0.12em; font-weight: 600;
+}
+#chat-gate:hover:not(:disabled) { filter: brightness(1.12); }
+#chat-gate:disabled {
+  background: rgba(6,10,20,0.75); color: var(--dim);
+  border: 1px solid rgba(255,255,255,0.14); cursor: default;
+}
+body.is-touch #chat-gate { font-size: 10px; padding: 7px 8px; border-radius: 6px; }
+
+.si-body { padding-top: 16px; }
+.si-lead { font-size: 13.5px; color: var(--text); line-height: 1.5; margin-bottom: 16px; }
+.si-btns { display: flex; flex-direction: column; gap: 10px; }
+.si-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 12px 16px; border-radius: 10px;
+  font-family: 'Inter', system-ui, sans-serif; font-size: 14px; font-weight: 600;
+}
+.si-btn svg { width: 20px; height: 20px; flex: 0 0 20px; }
+.si-btn[hidden] { display: none; }
+.si-google { background: #fff; color: #1f1f1f; border: 1px solid #dadce0; }
+.si-google:hover { background: #eef2fb; }
+.si-discord { background: #5865f2; color: #fff; border: 1px solid #5865f2; }
+.si-discord:hover { background: #4752c4; border-color: #4752c4; }
+.si-status { min-height: 18px; margin: 12px 0 4px; font-size: 12px; color: var(--blue-soft); line-height: 1.45; }
+.si-status.err { color: #ff8a7a; }
+.si-note { font-size: 11.5px; color: var(--dim); line-height: 1.55; }
+.si-note .link-btn, .si-fine .link-btn { padding: 0 2px; font-size: 10px; }
+.si-note[hidden], .si-view[hidden], #si-email-block[hidden] { display: none !important; }
+.si-or {
+  display: flex; align-items: center; gap: 10px; margin: 16px 0 12px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.2em; color: var(--dim); text-transform: uppercase;
+}
+.si-or::before, .si-or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.si-form { display: flex; flex-direction: column; gap: 8px; }
+.si-form input {
+  width: 100%; background: rgba(6,10,20,0.75); border: 1px solid rgba(255,255,255,0.14); color: var(--text);
+  border-radius: 9px; padding: 11px 12px; font-family: 'Inter', system-ui, sans-serif; font-size: 14px; outline: none;
+}
+.si-form input:focus { border-color: var(--blue); }
+body.is-touch .si-form input { font-size: 16px; }   /* stops iOS zooming in on focus */
+.si-submit {
+  width: 100%; background: var(--blue); border: none; color: #fff; border-radius: 9px; padding: 11px 14px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; letter-spacing: 0.14em;
+}
+.si-submit:hover:not(:disabled) { filter: brightness(1.12); }
+.si-submit:disabled { opacity: 0.55; cursor: default; }
+.si-links { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.si-links .link-btn { font-size: 10px; }
+.si-fine { font-size: 11px; color: var(--dim); line-height: 1.5; margin-top: 10px; }
+#si-c-email { color: var(--text); word-break: break-all; }
+#acct-label, #acct-name { text-transform: none; }
+
+/* ===================== OPERATOR: announcement + panel ===================== */
+#announce {
+  position: fixed; inset: 0; z-index: 60; display: none;
+  align-items: flex-start; justify-content: center; padding-top: 12vh;
+  pointer-events: none;
+}
+#announce.show { display: flex; animation: annIn 0.35s cubic-bezier(.2,.9,.3,1.4); }
+.an-box {
+  background: rgba(60,8,12,0.94); border: 1px solid #ff3b46; border-radius: 14px;
+  padding: 18px 30px; max-width: min(620px, 88vw); text-align: center;
+  box-shadow: 0 0 0 1px rgba(255,59,70,0.4), 0 24px 70px rgba(0,0,0,0.6);
+  backdrop-filter: blur(8px);
+}
+.an-kicker { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.3em; color: #ff5a63; margin-bottom: 8px; }
+#an-text { font-size: 18px; font-weight: 600; color: #ffe6e8; line-height: 1.45; }
+@keyframes annIn { from { opacity: 0; transform: translateY(-18px) scale(0.96); } }
+
+#opspanel {
+  display: none; position: fixed; top: calc(var(--tb-h, 46px) + 8px); right: 12px; z-index: 46;
+  width: min(350px, 92vw); max-height: 80vh; overflow-y: auto;
+  /* The full red outline shouted at you the whole time the panel was open. The
+     operator identity now comes from a red edge and the title, which reads as
+     "staff tool" without fighting the rest of the interface for attention. */
+  background: rgba(8,13,24,0.97);
+  border: 1px solid var(--line); border-left: 3px solid #ff3b46;
+  border-radius: 12px; padding: 0 0 12px; pointer-events: auto;
+  box-shadow: 0 18px 55px rgba(0,0,0,0.6);
+  scrollbar-width: thin;
+}
+#opspanel.open { display: block; }
+.op-head {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.2em;
+  background: rgba(8,13,24,0.98); border-bottom: 1px solid var(--line);
+  padding: 11px 14px;
+}
+.op-title { color: #ff5a63; }
+.op-x { margin-left: 4px; }
+/* section tabs — the panel had grown long enough that everything competed for
+   the same scroll */
+.op-tabs { display: flex; gap: 2px; padding: 8px 12px 0; }
+.op-tab {
+  flex: 1; background: none; border: 0; border-bottom: 2px solid transparent;
+  color: var(--dim); font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+  letter-spacing: 0.18em; padding: 7px 4px; cursor: pointer;
+}
+.op-tab:hover { color: var(--text); }
+.op-tab.on { color: #fff; border-bottom-color: #ff3b46; }
+.op-pane { display: none; padding: 4px 14px 0; }
+.op-pane.on { display: block; }
+/* teleport results */
+.op-tpout { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; max-height: 150px; overflow-y: auto; }
+.op-tpout button {
+  text-align: left; background: var(--panel2); border: 1px solid var(--line);
+  color: var(--text); border-radius: 7px; padding: 6px 9px; cursor: pointer;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+}
+.op-tpout button:hover { border-color: var(--blue); color: var(--blue-soft); }
+.op-quick .chip { flex: 1 1 auto; font-size: 9px; padding: 6px 8px; }
+.op-quick .chip.sel { background: var(--blue); border-color: var(--blue); color: #fff; }
+.op-pos {
+  flex: 1; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--blue-soft);
+}
+.op-sec {
+  font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.24em;
+  color: var(--blue-soft); margin: 12px 0 6px;
+}
+.op-players { display: flex; flex-direction: column; gap: 5px; max-height: 210px; overflow-y: auto; }
+/* A row is now a single click target that selects the pilot; the actions live
+   in one place below instead of five buttons repeated on every line. */
+.op-p {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 7px 9px; cursor: pointer; text-align: left; width: 100%;
+}
+.op-p:hover { border-color: var(--blue); }
+.op-p.sel { border-color: #ff3b46; background: rgba(255,59,70,0.10); }
+.op-dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 7px; background: var(--dim); }
+.op-dot.fly { background: var(--ok); }
+/* selected-pilot action block */
+.op-sel {
+  margin-top: 9px; padding: 10px; border-radius: 9px;
+  background: rgba(255,59,70,0.07); border: 1px solid rgba(255,59,70,0.35);
+}
+.op-selhead { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.op-selhead b { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #fff; }
+.op-selhead .op-x { margin-left: auto; }
+.op-acts { margin-bottom: 8px; }
+.op-acts .chip { flex: 1 1 auto; font-size: 9px; padding: 7px 6px; text-align: center; }
+.op-danger { border-color: rgba(255,59,70,0.55); color: #ff9aa0; }
+.op-danger:hover { background: rgba(255,59,70,0.22); }
+.op-p b { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text); }
+/* aircraft + altitude under the callsign, so the row says who they are AND
+   what they are doing without opening anything */
+.op-sub {
+  font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.08em;
+  color: var(--dim); font-style: normal; margin-right: auto; padding-left: 2px;
+}
+.op-count {
+  font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.14em;
+  color: var(--dim); margin-left: auto; margin-right: 8px;
+}
+.op-p .chip { padding: 3px 7px; font-size: 9px; }
+.op-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.op-row input {
+  flex: 1; min-width: 0; background: rgba(6,10,20,0.8); border: 1px solid var(--line);
+  color: var(--text); border-radius: 8px; padding: 7px 10px; font-size: 12px; outline: none;
+}
+/* swatches were overlapping: they are flex items, so they need to be told
+   not to shrink, and the row needs to wrap rather than squeeze */
+.op-colors { gap: 8px; flex-wrap: wrap; }
+.op-sw {
+  width: 26px; height: 26px; flex: 0 0 26px; padding: 0;
+  border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); cursor: pointer;
+}
+.op-sw.sel { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,0.25); }
+/* label above, state below — one line each, so nothing wraps mid-word */
+.op-toggles .chip {
+  flex: 1 1 92px; text-align: center; display: flex; flex-direction: column;
+  gap: 2px; padding: 7px 6px; line-height: 1.2;
+}
+.op-toggles .chip i { font-style: normal; font-size: 8px; letter-spacing: 0.16em; color: var(--dim); }
+.op-toggles .chip b { font-size: 10px; color: var(--text); font-weight: 600; }
+.op-toggles .chip.on i, .op-toggles .chip.on b { color: #ff9aa0; }
+.op-toggles .chip.on { background: rgba(255,59,70,0.2); border-color: #ff3b46; color: #ff9aa0; }
+.op-who { color: var(--dim); letter-spacing: 0.05em; }
+
+/* operator warning — dimmed screen, forced read delay */
+#warnbox {
+  position: fixed; inset: 0; z-index: 62; display: none;
+  align-items: center; justify-content: center; padding: 20px;
+  background: rgba(4,7,13,0.72); backdrop-filter: blur(4px);
+  pointer-events: auto;
+}
+#warnbox.show { display: flex; animation: annIn 0.3s ease-out; }
+.warn-card {
+  background: linear-gradient(rgba(46,34,4,0.97), rgba(28,20,4,0.97));
+  border: 1px solid #ffb020; border-radius: 16px;
+  padding: 24px 26px; max-width: min(520px, 92vw); text-align: center;
+  box-shadow: 0 0 0 1px rgba(255,176,32,0.35), 0 26px 80px rgba(0,0,0,0.65);
+}
+.warn-icon { font-size: 40px; line-height: 1; margin-bottom: 6px; }
+.warn-kicker {
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.28em;
+  color: #ffb020; margin-bottom: 12px;
+}
+#warn-text { font-size: 16px; line-height: 1.5; color: #fff2d6; margin-bottom: 18px; word-break: break-word; }
+#warn-ok { width: 100%; }
+#warn-ok:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+.warn-foot { margin-top: 12px; font-size: 11px; color: rgba(255,242,214,0.6); }
+
+/* phones: the operator surfaces have to fit too */
+@media (max-width: 560px) {
+  #opspanel { right: 6px; left: 6px; width: auto; max-height: 70vh; }
+  .op-p { gap: 5px; }
+  .op-p .chip { padding: 4px 6px; font-size: 9px; }
+  .op-row input { font-size: 16px; }       /* no iOS zoom-on-focus */
+  .an-box { padding: 14px 18px; }
+  #an-text { font-size: 15px; }
+  .warn-card { padding: 18px 16px; }
+  #warn-text { font-size: 14px; }
+  .warn-icon { font-size: 32px; }
+}
+
+/* ============================= CONSENT / LEGAL ============================= */
+#consent {
+  position: fixed; inset: 0; z-index: 70; display: none;
+  align-items: center; justify-content: center; padding: 20px;
+  background: rgba(4,7,13,0.6); backdrop-filter: blur(3px);
+}
+.cs-box {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 16px; padding: 28px clamp(20px, 4vw, 36px);
+  max-width: 620px; box-shadow: 0 20px 80px rgba(0,0,0,0.55);
+  animation: cfin 0.2s ease-out;
+}
+.cs-box b { font-size: 15px; }
+.cs-box p { font-size: 12.5px; color: var(--dim); line-height: 1.55; margin: 10px 0 14px; }
+.cs-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.cs-btns .btn-primary, .cs-btns .btn-ghost { border-radius: 9px; font-size: 12px; padding: 12px 18px; }
+.cs-links { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--dim); letter-spacing: 0.08em; }
+
+#legal {
+  position: fixed; inset: 0; z-index: 72; display: none;
+  align-items: center; justify-content: center; background: rgba(4,7,13,0.7);
+}
+.legal-box {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  width: min(680px, 92vw); max-height: 84vh; overflow-y: auto;
+  padding: 22px 26px;
+}
+.legal-pane { display: none; }
+.legal-pane.sel { display: block; }
+.legal-pane h4 { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.22em; color: var(--blue-soft); margin: 16px 0 6px; }
+.legal-pane p { font-size: 12.5px; color: var(--dim); line-height: 1.6; margin-bottom: 10px; }
+.legal-pane a { color: var(--blue-soft); }
+.legal-links { display: flex; gap: 12px; align-items: center; }
+.made-by { color: var(--dim); letter-spacing: 0.06em; }
+.legal-op { font-size: 12.5px; color: var(--text); line-height: 1.6; margin-bottom: 6px; }
+.legal-date { font-size: 11px; opacity: 0.65; margin-top: 14px; }
+
+/* ============================= DEPARTURE CONFIRM ============================= */
+/* FLIGHT SETUP lives inside the setup card as step 3 — the globe previews
+   the destination next to it (pulsing ring) until TAKE OFF */
+.cf-name { font-family: 'Anton', sans-serif; font-size: clamp(24px, 3vw, 34px); margin: 14px 0 4px; }
+.cf-sub { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.12em; color: var(--dim); margin-bottom: 16px; }
+.cf-opts {
+  display: flex; flex-direction: column; gap: 12px;
+  background: rgba(6,10,20,0.5); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px 16px; margin-bottom: 20px; text-align: left;
+  /* The card is a fixed height with overflow:hidden, so anything that does not
+     fit is clipped — and TAKE OFF is pinned to the bottom, so IT is what gets
+     cut. Adding the departure panel pushed it over the edge. Let this list
+     shrink and scroll instead: min-height:0 is the part that actually permits
+     shrinking below content size inside a flex column. It stays hugging its
+     content whenever everything fits, so short cards look unchanged. */
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.cf-opts::-webkit-scrollbar { width: 8px; }
+.cf-opts::-webkit-scrollbar-thumb {
+  background: rgba(126,164,255,0.28); border-radius: 4px;
+}
+.cf-opts::-webkit-scrollbar-track { background: transparent; }
+.cf-opt label { display: block; font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.26em; color: var(--blue-soft); margin-bottom: 7px; }
+.cf-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+/* DEPARTURE is not a preference like time of day — it decides what you are
+   doing the second the world loads, so it gets lifted out of the stack of
+   small toggles it was disappearing into. Own panel, accent edge, bigger
+   chips. */
+#cf-dep-opt {
+  margin-top: 6px;
+  padding: 13px 14px;
+  border: 1px solid rgba(47,111,255,0.45);
+  border-left: 3px solid var(--blue);
+  border-radius: 10px;
+  background: rgba(47,111,255,0.09);
+}
+#cf-dep-opt > label { font-size: 10px; color: #a8c4ff; }
+#cf-dep-opt .chip { padding: 9px 15px; font-size: 11px; letter-spacing: 0.14em; }
+body.theme-light #cf-dep-opt {
+  border-color: rgba(47,111,255,0.35);
+  background: rgba(47,111,255,0.06);
+}
+body.theme-light #cf-dep-opt > label { color: var(--l-blue); }
+
+/* Tells you which runway you'd actually be sitting on before you commit to it. */
+.cf-note {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.08em;
+  color: var(--dim); margin-top: 7px; line-height: 1.5;
+}
+.cf-note:empty { display: none; }
+.cf-note b { color: var(--blue-soft); font-weight: 600; }
+body.theme-light .cf-note b { color: var(--l-blue); }
+
+/* ============================= LOADER ============================= */
+#loader {
+  position: fixed; inset: 0; z-index: 60; display: none;
+  align-items: center; justify-content: center;
+  /* "safe" keeps the TOP reachable when the box is taller than the viewport.
+     Plain centering in a scroll container overflows equally in both
+     directions, and the overflow above the start edge cannot be scrolled to —
+     so the destination name and the first briefing rows became unreachable.
+     Older engines drop this line and keep the plain `center` above. */
+  align-items: safe center;
+  background: var(--ink);
+  /* Scrollable, not clipped. On a phone in landscape — which is how a flight
+     sim is actually held — the box is taller than the viewport, and with
+     overflow:hidden the bottom of it was simply cut off. That silently ate
+     the VPN warning, the one thing on this screen the player needs to act on. */
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 0;
+}
+/* blurred satellite top-view of the chosen destination */
+#loader-bg {
+  position: absolute; inset: -10px; pointer-events: none;
+  background-size: cover; background-position: center;
+  /* barely blurred — the user wants to actually SEE the destination */
+  filter: blur(3px) brightness(0.42) saturate(1.1);
+  opacity: 0; transition: opacity 0.9s ease;
+}
+.loader-box { width: min(480px, 86vw); text-align: center; position: relative; z-index: 1; }
+.loader-kicker { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.3em; color: var(--orange); margin-bottom: 10px; }
+.loader-place { font-family: 'Anton', sans-serif; font-size: clamp(30px, 6vw, 54px); letter-spacing: 0.02em; margin-bottom: 22px; }
+.loader-track { height: 4px; background: var(--line); margin-bottom: 12px; border-radius: 2px; overflow: hidden; }
+#loader-bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--blue), #cfe2ff); transition: width 0.25s; }
+.loader-note { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--dim); }
+
+/* flight briefing rows on the loading screen */
+.brief-list {
+  text-align: left; margin: 6px 0 24px;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: rgba(10,18,32,0.5); padding: 6px 16px;
+}
+.brief-row {
+  display: flex; align-items: baseline; gap: 14px;
+  padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+}
+.brief-row:last-child { border-bottom: none; }
+.brief-row i { font-style: normal; color: var(--blue); font-size: 10px; }
+.brief-row span { color: var(--dim); letter-spacing: 0.16em; font-size: 10px; }
+.brief-row b { margin-left: auto; color: var(--text); font-weight: 600; text-align: right; }
+.loader-tip {
+  margin-top: 16px; font-size: 12px; color: var(--blue-soft);
+  font-style: italic; min-height: 18px; transition: opacity 0.3s;
+}
+
+/* ============================= HUD ============================= */
+#hud { display: none; position: fixed; inset: 0; z-index: 20; pointer-events: none; }
+
+#topbar {
+  position: absolute; top: 0; left: 0; right: 0;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  background: linear-gradient(rgba(4,7,13,0.85), rgba(4,7,13,0));
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.12em;
+  /* WRAP, don't clip: nowrap + a hidden scrollbar meant that narrowing the
+     window pushed buttons off the right edge with no way to reach them.
+     Now the row reflows onto a second line instead. */
+  flex-wrap: wrap; row-gap: 6px;
+}
+#topbar::-webkit-scrollbar { display: none; }
+/* the settings dropdown hangs off the topbar, so it must follow it down when
+   the bar wraps to two rows (JS keeps --tb-h in sync with the real height) */
+/* settings is a centred modal now — not anchored to the topbar */
+.tb-btn.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+#paused-ov {
+  position: fixed; inset: 0; z-index: 35; display: none;
+  flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  background: rgba(4,7,13,0.45); backdrop-filter: blur(2px);
+  cursor: pointer; pointer-events: auto;
+}
+#paused-ov .p-big { font-family: 'Anton', sans-serif; font-size: clamp(40px, 8vw, 72px); letter-spacing: 0.06em; color: #fff; text-shadow: 0 0 40px rgba(47,111,255,0.8); }
+#paused-ov span { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.24em; color: var(--blue-soft); }
+.tb-btn {
+  pointer-events: auto; background: rgba(10,18,32,0.8); border: 1px solid var(--line);
+  color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  letter-spacing: 0.12em; padding: 5px 10px; border-radius: 7px;
+}
+.tb-btn:hover { border-color: var(--orange); }
+/* icon-only topbar buttons: the SVG is the content, so kill the text metrics
+   that would otherwise pad it off-centre */
+.tb-iconbtn { line-height: 0; padding: 4px 8px; display: inline-flex; align-items: center; }
+.tb-iconbtn:hover { border-color: var(--blue); }
+.tb-btn.off { color: var(--dim); opacity: 0.72; }
+/* CONTROLS was buried in the settings dropdown — new players could not find
+   out how to fly. It sits in the topbar now, styled like every other button;
+   a brief pulse on the first flights is enough to draw the eye. */
+.ctrls-btn.nudge { animation: ctrlPulse 2s ease-in-out 4; }
+@keyframes ctrlPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(110,168,255,0); }
+  50% { box-shadow: 0 0 0 7px rgba(110,168,255,0.30); }
+}
+.tb-item { color: var(--text); }
+.tb-item.accent { color: var(--orange); }
+.tb-item.dim { color: var(--dim); }
+
+/* ---- topbar readouts ----
+   These used to be four bare spans in a row, which read as one long run-on
+   sentence ("LCLK · Larnaca Intl AIRBUS A320 CHASE 5 OTHER PILOTS"). Grouped
+   instead: the flight identity in one bordered strip, and the camera and the
+   live pilot count as separate chips, so the eye can find each of them. */
+.tb-strip {
+  display: inline-flex; align-items: center; gap: 9px;
+  background: rgba(10,18,32,0.72); border: 1px solid var(--line);
+  border-radius: 8px; padding: 4px 10px; min-width: 0;
+}
+.tbf-loc {
+  color: #e8f0ff; font-weight: 600; letter-spacing: 0.1em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 34vw;
+}
+/* the aircraft sits behind a rule, quieter than the place — you always know
+   what you are flying, but where you are changes */
+.tbf-ac {
+  color: var(--blue-soft); letter-spacing: 0.1em; white-space: nowrap;
+  padding-left: 9px; border-left: 1px solid var(--line);
+}
+.tb-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(10,18,32,0.55); border: 1px solid var(--line);
+  border-radius: 999px; padding: 4px 10px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.14em;
+  color: var(--dim); white-space: nowrap;
+}
+/* CAMERA chip. "CHASE" on its own meant nothing to anyone who did not already
+   know it was a camera mode, so the chip names the category and the value
+   reads as the setting — and pressing it cycles the view. */
+.tb-view { cursor: pointer; pointer-events: auto; color: #cfe0ff; transition: border-color 0.15s; }
+.tb-view::before {
+  content: 'VIEW';
+  color: var(--dim); font-size: 8.5px; letter-spacing: 0.2em;
+}
+.tb-view:hover { border-color: var(--blue); }
+/* live pilot count: a chip with a breathing dot, so "other people are up
+   there right now" reads at a glance instead of as more grey text */
+.tb-live { cursor: pointer; pointer-events: auto; transition: border-color 0.15s, color 0.15s; }
+.tb-live:hover { border-color: var(--blue); color: #dbe7ff; }
+.tb-live::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: #3ddc84; box-shadow: 0 0 8px rgba(61,220,132,0.9);
+  animation: tbpulse 2.4s ease-in-out infinite;
+}
+/* flying alone: the dot goes quiet and grey rather than claiming company */
+.tb-live.solo { color: var(--dim); }
+.tb-live.solo::before { background: #55627a; box-shadow: none; animation: none; }
+@keyframes tbpulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .tb-live::before { animation: none; } }
+
+/* --tb-h tracks the REAL topbar height (it wraps to two rows on narrow
+   windows), so everything pinned under it moves down instead of being
+   overlapped by the second row of buttons */
+#obj-bar {
+  position: absolute; top: var(--tb-h, 46px); left: 50%; transform: translateX(-50%);
+  display: none; text-align: center;
+  background: rgba(8,14,26,0.72); border: 1px solid var(--blue);
+  border-radius: 10px; backdrop-filter: blur(5px);
+  padding: 8px 22px; min-width: 300px;
+}
+#obj-title { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.3em; color: var(--blue-soft); }
+#obj-text { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 14px; letter-spacing: 0.08em; margin: 3px 0; }
+#obj-sub { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--orange); letter-spacing: 0.14em; }
+
+#compass-wrap {
+  position: absolute; top: var(--tb-h, 44px); left: 14px;
+  width: 110px; text-align: center;
+}
+#compass { width: 110px; height: 110px; display: block; }
+#comp-hdg {
+  display: inline-block; margin-bottom: 4px;
+  background: rgba(8,14,26,0.7); border: 1px solid rgba(126,164,255,0.35);
+  border-radius: 7px; padding: 2px 10px;
+  font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 13px;
+}
+
+#pfd {
+  position: absolute; left: 50%; bottom: clamp(90px, 14vh, 130px); transform: translateX(-50%);
+  width: 340px; height: 240px;
+}
+/* Sits directly above the PFD. Anchored to the same bottom value plus the PFD's
+   own height, so it tracks the panel at every viewport size instead of needing
+   its own set of breakpoints. */
+#start-hint {
+  position: absolute; left: 50%;
+  bottom: calc(clamp(90px, 14vh, 130px) + 248px);
+  transform: translateX(-50%);
+  display: none;
+  white-space: nowrap;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px; letter-spacing: 0.10em;
+  /* RED box: this is the one piece of UI a brand-new player has to notice, and
+     the old blue pill read as just another instrument and got looked past. */
+  color: #ffe6e8;
+  background: rgba(78,10,15,0.86);
+  border: 2px solid rgba(255,72,82,0.95);
+  border-radius: 999px;
+  padding: 8px 16px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 22px rgba(0,0,0,0.45), 0 0 24px rgba(255,48,58,0.38);
+  pointer-events: none;
+  z-index: 21;
+}
+#start-hint.show { display: block; animation: hintfade 15s ease forwards; pointer-events: auto; cursor: pointer; }
+/* click = early close. .bye is declared AFTER .show so its animation wins the
+   cascade at equal specificity; 'forwards' keeps it faded until the classes
+   are cleared for the next flight. */
+#start-hint.bye { animation: hintbye 0.35s ease forwards; pointer-events: none !important; cursor: default; }
+@keyframes hintbye { to { opacity: 0; transform: translateX(-50%) translateY(6px); } }
+/* The keys themselves in bright white — the strongest contrast available
+   against the red, so the letters read first and the words second. */
+#start-hint b { color: #fff; font-weight: 700; }
+/* 15 s total: in fast, hold ~13 s — long enough to read, look away and look
+   back — then out gently. The percentages keep the fade in at ~0.4 s and the
+   fade out at ~1.7 s, so the extra time all goes into the readable hold. */
+@keyframes hintfade {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  3%   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  89%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+/* Narrow screens: the pill is wider than the phone, so let it wrap. */
+@media (max-width: 520px) {
+  #start-hint { white-space: normal; max-width: 88vw; text-align: center; font-size: 11px; }
+}
+.tape-wrap { position: absolute; top: 0; bottom: 40px; width: 60px; background: rgba(6,10,20,0.48); border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; backdrop-filter: blur(6px); }
+.tape-wrap.left { left: 0; }
+.tape-wrap.right { right: 0; }
+.tape-wrap canvas { width: 100%; height: 100%; display: block; }
+.tape-cursor {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  background: rgba(6,10,20,0.95); border: 1px solid rgba(255,255,255,0.28); color: #fff;
+  border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+  font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 15px;
+  padding: 3px 7px; display: flex; align-items: baseline; gap: 3px;
+}
+.tape-cursor em { font-style: normal; font-size: 9px; color: var(--dim); }
+.tape-cursor.left { left: 0; }
+.tape-cursor.right { right: 0; }
+
+#adi {
+  position: absolute; left: 68px; right: 68px; top: 0; bottom: 40px;
+  overflow: hidden; border: 1px solid rgba(255,255,255,0.12); border-radius: 14px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+}
+#adi-ball { position: absolute; inset: -60px; }
+#adi-horizon { position: absolute; inset: -200px; }
+#adi-horizon .sky { position: absolute; left: 0; right: 0; top: -400px; bottom: 50%; background: linear-gradient(rgba(21,101,216,0.88), rgba(96,163,240,0.88)); }
+#adi-horizon .gnd { position: absolute; left: 0; right: 0; top: 50%; bottom: -400px; background: linear-gradient(rgba(133,89,44,0.9), rgba(84,55,26,0.9)); }
+#adi-ladder { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+.lad { position: absolute; left: -55px; width: 110px; display: flex; align-items: center; gap: 6px; justify-content: center; color: rgba(255,255,255,0.92); font-family: 'IBM Plex Mono', monospace; font-size: 9px; }
+.lad i { flex: 1; height: 0; border-top: 1px solid rgba(255,255,255,0.8); }
+.lad.zero { left: -90px; width: 180px; }
+.lad.zero i { border-top: 2px solid #fff; }
+.adi-fixed { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 26px; }
+.adi-fixed .wing { width: 34px; height: 0; border-top: 3px solid var(--orange); }
+.adi-fixed .dot { width: 6px; height: 6px; border: 3px solid var(--orange); border-radius: 50%; }
+#hud-alert {
+  position: absolute; left: 50%; top: 16%; transform: translateX(-50%);
+  font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 15px; letter-spacing: 0.25em;
+}
+#hud-alert.warn { color: var(--warn); animation: blink 0.5s infinite; }
+#hud-alert.info { color: var(--ok); }
+@keyframes blink { 50% { opacity: 0.15; } }
+
+.hdg-wrap { position: absolute; left: 68px; right: 68px; bottom: 0; height: 34px; background: rgba(6,10,20,0.48); border: 1px solid rgba(255,255,255,0.09); border-radius: 10px; backdrop-filter: blur(6px); }
+.hdg-wrap canvas { width: 100%; height: 100%; display: block; }
+.hdg-cursor {
+  position: absolute; left: 50%; top: -12px; transform: translateX(-50%);
+  background: var(--ink); border: 1px solid var(--orange);
+  font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 13px; padding: 1px 6px;
+}
+
+#readouts {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: clamp(46px, 8vh, 78px);
+  display: flex; flex-wrap: wrap; justify-content: center;
+  background: rgba(6,10,20,0.55); border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 12px; backdrop-filter: blur(6px);
+  padding: 3px; box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+}
+.ro {
+  padding: 5px 14px; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  font-family: 'IBM Plex Mono', monospace; min-width: 56px;
+  border-right: 1px solid rgba(255,255,255,0.08);
+}
+.ro:last-child { border-right: none; }
+.ro label { font-size: 8px; letter-spacing: 0.2em; color: var(--blue-soft); }
+.ro .val { font-size: 13px; font-weight: 600; color: #fff; }
+.ro .val.warn { color: var(--orange); }
+
+#attribution-sim { position: fixed; right: 6px; bottom: 4px; z-index: 21; font-size: 9px; color: rgba(143,160,189,0.5); pointer-events: none; }
+
+/* ============================= MISSION COMPLETE ============================= */
+#mission-done {
+  position: fixed; inset: 0; z-index: 45; display: none;
+  align-items: center; justify-content: center;
+  background: rgba(4,7,13,0.72);
+}
+.md-box {
+  background: var(--panel); border: 1px solid var(--orange);
+  padding: 36px 44px; text-align: center; min-width: min(420px, 88vw);
+}
+.md-stars { font-size: 38px; letter-spacing: 0.25em; color: var(--orange); }
+.md-label { font-family: 'Anton', sans-serif; font-size: 40px; margin: 8px 0 4px; }
+.md-detail { font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.16em; color: var(--dim); margin-bottom: 22px; }
+.md-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+/* ============================= TOUCH UI ============================= */
+.touch-ui { display: none; position: fixed; inset: 0; z-index: 30; pointer-events: none; }
+#stick {
+  position: absolute; left: 22px; bottom: 26px; width: 128px; height: 128px;
+  border: 2px solid rgba(110,168,255,0.6); border-radius: 50%;
+  background: rgba(10,18,32,0.4); pointer-events: auto;
+}
+#stick-nub {
+  position: absolute; left: 50%; top: 50%; margin: -26px 0 0 -26px;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: rgba(110,168,255,0.9); box-shadow: 0 0 18px rgba(47,111,255,0.5);
+}
+#throttle { position: absolute; right: 22px; bottom: 26px; width: 56px; height: 190px; pointer-events: auto; text-align: center; }
+#throttle-track {
+  position: relative; width: 46px; height: 160px; margin: 0 auto;
+  border: 2px solid rgba(47,111,255,0.6); background: rgba(10,18,32,0.4);
+  display: flex; align-items: flex-end;
+}
+#throttle-fill { width: 100%; background: linear-gradient(0deg, var(--blue), #cfe2ff); }
+#throttle label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--blue-soft); letter-spacing: 0.2em; }
+.touch-btns { position: absolute; right: 96px; bottom: 34px; display: flex; flex-direction: column; gap: 8px; pointer-events: auto; }
+.touch-btns button, .rudder-btns button {
+  background: rgba(10,18,32,0.75); border: 1px solid rgba(110,168,255,0.55); color: var(--text);
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.15em;
+  padding: 10px 14px; border-radius: 4px;
+}
+.touch-btns button.on { background: var(--blue); color: #fff; }
+.rudder-btns { position: absolute; left: 22px; bottom: 172px; display: flex; gap: 8px; pointer-events: auto; }
+
+/* ============================= CRASH / HELP ============================= */
+#crash {
+  position: fixed; top: 64px; right: 14px; z-index: 40; display: none;
+  flex-direction: column; align-items: flex-end; max-width: 300px; padding: 12px 14px;
+  background: rgba(8,11,17,0.82); border: 1px solid #3b536d; border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+.crash-box { text-align: right; }
+.crash-title { font-family: 'Anton', sans-serif; font-size: clamp(26px, 3vw, 36px); color: var(--warn); letter-spacing: 0.04em; }
+.crash-reason { font-family: 'IBM Plex Mono', monospace; font-size: 14px; letter-spacing: 0.3em; color: var(--text); margin: 8px 0 14px; }
+.crash-note { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--dim); }
+.crash-actions { display: flex; gap: 10px; justify-content: center; margin: 4px 0 12px; flex-wrap: wrap; }
+.crash-actions button, #crash-bar button {
+  background: #172536; border: 1px solid #3b536d; color: #dce8f5; border-radius: 4px;
+  padding: 10px 16px; font: 600 11px ui-monospace, Consolas, monospace; letter-spacing: 0.12em; cursor: pointer;
+}
+.crash-actions button:hover, #crash-bar button:hover { border-color: #ff9c4b; color: #fff; background: #293448; }
+#crash-view { color: #ffb45d; }
+#crash-bar {
+  display: none; position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 60;
+  align-items: center; gap: 14px; padding: 8px 14px; background: rgba(10, 14, 20, 0.82);
+  border: 1px solid #3b536d; border-radius: 6px; font: 600 11px ui-monospace, Consolas, monospace;
+  letter-spacing: 0.14em; color: #ffb45d;
+}
+#crash-bar button { padding: 7px 12px; color: #dce8f5; }
+
+/* CONTROLS content — the frame comes from the shared .wm shell. */
+.help-box table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+.help-box td { padding: 5px 4px; font-size: 12.5px; border-bottom: 1px solid var(--line); }
+.help-box td:first-child { font-family: 'IBM Plex Mono', monospace; color: var(--orange); font-size: 11px; letter-spacing: 0.08em; width: 110px; }
+
+/* ======================= UNIFIED MODAL SHELL =========================
+   PAUSE, SETTINGS, CONTROLS and GRAPHICS are one family. They share this
+   shell so moving between them reads as navigating ONE place rather than
+   opening four different windows — same position, same frame, same header,
+   so only the contents appear to change. */
+.wm {
+  position: fixed; inset: 0; z-index: 60; display: none;
+  align-items: center; justify-content: center;
+  background: rgba(3,6,12,0.72); backdrop-filter: blur(3px);
+  pointer-events: auto;            /* #hud is pointer-events:none */
+  padding: 16px;
+}
+.wm.open { display: flex; animation: wmfade 0.16s ease-out; }
+@keyframes wmfade { from { opacity: 0; } to { opacity: 1; } }
+.wm-box {
+  background: rgba(9,15,27,0.98); border: 1px solid var(--line); border-radius: 14px;
+  width: min(560px, 100%); max-height: min(88vh, 820px);
+  display: flex; flex-direction: column;
+  box-shadow: 0 26px 80px rgba(0,0,0,0.66);
+  animation: wmrise 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.wm-narrow { width: min(420px, 100%); }
+@keyframes wmrise { from { transform: translateY(10px) scale(0.985); opacity: 0; } to { transform: none; opacity: 1; } }
+.wm-head {
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  padding: 14px 16px; border-bottom: 1px solid var(--line);
+}
+.wm-title {
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.24em;
+  color: #eaf1ff; font-weight: 600;
+}
+.wm-sub { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.14em; color: var(--dim); }
+.wm-tag {
+  font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.16em;
+  color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px;
+}
+/* BACK is only meaningful when something is underneath — the router adds
+   .has-back, so a modal opened directly from the topbar shows no dead arrow */
+.wm-back {
+  display: none; background: rgba(110,168,255,0.10); border: 1px solid var(--line);
+  color: #cfe0ff; border-radius: 8px; width: 28px; height: 26px; line-height: 1;
+  font-size: 18px; cursor: pointer; padding: 0 0 2px; flex-shrink: 0;
+}
+.wm.has-back .wm-back { display: block; }
+.wm-back:hover { border-color: var(--blue); background: rgba(110,168,255,0.2); color: #fff; }
+.wm-x {
+  margin-left: auto; background: none; border: 0; color: var(--dim);
+  font-size: 15px; cursor: pointer; padding: 2px 4px; line-height: 1; flex-shrink: 0;
+}
+.wm-x:hover { color: #fff; }
+.wm-body {
+  overflow-y: auto; flex: 1 1 auto; min-height: 0; padding: 6px 16px 16px;
+  scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+.wm-body::-webkit-scrollbar { width: 7px; }
+.wm-body::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+.wm-foot { flex-shrink: 0; padding: 12px 16px 16px; display: flex; justify-content: flex-end; }
+
+/* ---- pause hub: big tappable rows, phone-friendly by default ---- */
+.wm-menu { padding-top: 12px; }
+.wm-item {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  background: rgba(10,18,32,0.7); border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 8px; transition: border-color 0.14s, background 0.14s, transform 0.14s;
+}
+.wm-item:hover { border-color: var(--blue); background: rgba(47,111,255,0.12); transform: translateX(2px); }
+.wm-item b {
+  display: block; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px;
+  letter-spacing: 0.18em; color: #eaf1ff; font-weight: 600;
+}
+.wm-item i { display: block; font-style: normal; font-size: 11.5px; color: var(--dim); margin-top: 3px; }
+.wm-item.wm-primary {
+  background: linear-gradient(90deg, rgba(47,111,255,0.26), rgba(47,111,255,0.08));
+  border-color: rgba(47,111,255,0.55);
+}
+.wm-item.wm-primary:hover { background: linear-gradient(90deg, rgba(47,111,255,0.36), rgba(47,111,255,0.14)); }
+.wm-item.wm-quit b { color: #ffb4b8; }
+.wm-item.wm-quit:hover { border-color: #ff5a62; background: rgba(255,90,98,0.12); }
+
+/* ---- photo mode ---- */
+.photo-img {
+  display: block; width: 100%; margin-top: 10px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: #060a12;
+}
+.photo-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
+.photo-actions a.tb-btn { text-decoration: none; display: inline-flex; align-items: center; }
+
+/* ===================== ADVANCED GRAPHICS PANEL ======================= */
+/* GRAPHICS content — frame, header, scroll and animation all come from the
+   shared .wm shell above; only the rows and segmented controls live here. */
+.gfx-row {
+  display: flex; align-items: center; gap: 16px;
+  padding: 13px 0; border-bottom: 1px solid var(--line);
+}
+.gfx-l { flex: 1 1 auto; min-width: 0; }
+.gfx-l b {
+  display: block; font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  letter-spacing: 0.16em; color: #dbe7ff; font-weight: 600;
+}
+.gfx-l i { display: block; font-style: normal; font-size: 11.5px; color: var(--dim); margin-top: 3px; }
+/* segmented control — one row of choices, the active one lit */
+.gfx-seg { display: flex; flex-shrink: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.gfx-seg button {
+  background: transparent; border: 0; border-left: 1px solid var(--line);
+  color: var(--dim); font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  letter-spacing: 0.08em; padding: 7px 11px; cursor: pointer; transition: background 0.15s, color 0.15s;
+}
+.gfx-seg button:first-child { border-left: 0; }
+.gfx-seg button:hover { background: rgba(110,168,255,0.10); color: #cfe0ff; }
+.gfx-seg button.on { background: var(--blue); color: #fff; }
+/* AUTO mode: the manual rows stay VISIBLE but inert, so the panel reads as
+   one thing you can inspect rather than a box that empties itself */
+#gfx-manual { transition: opacity 0.2s; }
+#gfx.auto #gfx-manual { opacity: 0.35; pointer-events: none; }
+.gfx-foot {
+  display: flex; align-items: center; gap: 14px; padding-top: 16px;
+}
+#gfx-note { flex: 1 1 auto; font-size: 11.5px; color: var(--dim); }
+@media (max-width: 560px) {
+  .gfx-row { flex-direction: column; align-items: stretch; gap: 9px; }
+  .gfx-seg { align-self: flex-start; }
+  .gfx-foot { flex-direction: column; align-items: stretch; }
+}
+
+/* ============================= RESPONSIVE ============================= */
+@media (max-width: 900px) {
+  .hero-simple { grid-template-columns: 1fr; }
+  .hero-globe { order: -1; margin: 0 auto; }
+  /* 35% smaller than the old 320px/46vh — it dominated the phone screen */
+  .globe-square { max-width: min(208px, 30vh); max-height: min(30vh, 208px); }
+  .hero-left { max-width: none; }
+  .nav-hot { display: none; }
+  .gkey-wrap { display: none; }
+}
+@media (max-width: 640px) {
+  #topbar { font-size: 10px; gap: 7px; }
+  #tb-cam { display: none; }
+  #obj-bar { min-width: 0; width: 92vw; top: 200px; }
+  /* tuck the required map attribution into the free top-right corner, tiny */
+  #attribution-sim {
+    top: 158px; bottom: auto; right: 5px; left: auto;
+    max-width: 42vw; text-align: right; font-size: 7px; line-height: 1.3;
+    color: rgba(143,160,189,0.4);
+  }
+}
+
+/* ---- TOUCH DEVICES: compact top instrument cluster, both orientations ---- */
+body.is-touch #pfd {
+  top: 48px; bottom: auto; left: 50%; /* fully clear of the topbar buttons */
+  transform: translateX(-50%) scale(0.48); transform-origin: top center;
+}
+body.is-touch #readouts {
+  /* V/S · THR · FLAPS · GEAR · RA strip lives at the BOTTOM on touch */
+  top: auto; bottom: 14px; left: 50%;
+  transform: translateX(-50%) scale(0.66); transform-origin: bottom center;
+  width: auto; flex-wrap: nowrap; white-space: nowrap;
+}
+body.is-touch #compass-wrap { transform: scale(0.48); transform-origin: top left; top: var(--tb-h, 46px); left: 4px; }
+/* the chat box opens exactly where the compass sits — hide just the compass */
+body.is-touch #hud.chatting #compass-wrap { opacity: 0; pointer-events: none !important; }
+/* slim the topbar down to the essentials on touch */
+/* hide the STRIP, not its two children — hiding the children alone left an
+   empty bordered pill sitting in the phone topbar */
+body.is-touch #tb-flight, body.is-touch #tb-mp,
+body.is-touch #btn-ctrls, body.is-touch .sp-keys { display: none; }
+body.is-touch .tb-btn { padding: 5px 8px; }
+
+/* landscape phones: even tighter, drop the POS cell, mission bar to bottom */
+@media (orientation: landscape) and (max-height: 500px) {
+  body.is-touch #pfd { transform: translateX(-50%) scale(0.4); top: 42px; }
+  body.is-touch #readouts { bottom: 8px; transform: translateX(-50%) scale(0.58); }
+  body.is-touch .ro.wide { display: none; }
+  /* readouts own the bottom now — mission bar goes under the compass */
+  body.is-touch #obj-bar { top: 108px; bottom: auto; width: auto; }
+  body.is-touch #compass-wrap { transform: scale(0.4); top: 34px; }
+  body.is-touch #throttle { height: 140px; }
+  body.is-touch #throttle-track { height: 112px; }
+  body.is-touch #stick { width: 104px; height: 104px; }
+  body.is-touch #attribution-sim { top: auto; bottom: 2px; right: 5px; }
+}
+
+/* rotate suggestion (portrait phones in flight) */
+#rotate-hint {
+  position: fixed; left: 50%; bottom: 220px; transform: translateX(-50%);
+  z-index: 36; display: none; pointer-events: auto; cursor: pointer;
+  background: rgba(10,18,32,0.85); border: 1px solid var(--blue);
+  border-radius: 10px; padding: 9px 16px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.1em;
+  color: var(--text); text-align: center;
+}
+#rotate-hint b { color: var(--blue-soft); }
+
+/* small transient toast */
+#toast {
+  position: fixed; left: 50%; top: 60px; transform: translateX(-50%);
+  z-index: 80; display: none; max-width: 90vw;
+  background: rgba(10,18,32,0.92); border: 1px solid var(--blue);
+  border-radius: 10px; padding: 10px 16px;
+  font-size: 12px; color: var(--text); text-align: center;
+}
+
+
+/* ============================= THEME TOGGLE ============================= */
+.theme-toggle {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.16em;
+  background: transparent; border: 1px solid var(--line); color: var(--dim);
+  padding: 6px 10px; margin-left: 14px;
+}
+.theme-toggle:hover { border-color: var(--blue); color: var(--text); }
+
+/* ============================= DAY THEME =============================
+   The Flight Simulator site is not a light page. It is a HIGH CONTRAST one:
+   black bar, dark full-bleed hero, a hard blue band, and only then white.
+   The white reads as bright because it is cut against black — take the dark
+   away and the whole thing goes pale and characterless.
+
+   So the fold stays dark. The globe and the aircraft picker were built for a
+   dark field and look wrong floating on white, and the headline needs
+   something to punch against. Everything BELOW the fold turns white, which is
+   where the reading actually happens.
+
+   The cockpit is never themed: a pale HUD over a bright sky cannot be read.
+   Nothing above this line is modified, so the night theme cannot regress. */
+body.theme-light {
+  --l-page:   #eef2f7;
+  --l-card:   #ffffff;
+  --l-nav:    #060f1a;
+  --l-ink:    #08131f;
+  --l-body:   #3c4d64;
+  --l-dim:    #6b7d95;
+  --l-line:   #ccd7e6;
+  --l-blue:   #0d7fd8;
+  --l-bright: #12a5ff;
+  --l-pale:   #e9f2fd;
+}
+
+/* ---- page ---- */
+body.theme-light #landing { background: var(--l-page); color: var(--l-body); }
+
+/* ---- bar ---- */
+body.theme-light .topnav { background: var(--l-nav); border-bottom: none; }
+body.theme-light .nav-brand { color: #fff; }
+body.theme-light .brand-mark { color: var(--l-bright); }
+body.theme-light .nav-links a { color: rgba(255,255,255,0.78); }
+body.theme-light .nav-links a:hover,
+body.theme-light .nav-links a.on { color: #fff; border-bottom-color: var(--l-bright); }
+body.theme-light .nav-live { color: rgba(255,255,255,0.6); }
+body.theme-light .nav-live b { color: #fff; }
+body.theme-light .theme-toggle { border-color: rgba(255,255,255,0.28); color: rgba(255,255,255,0.82); }
+body.theme-light .theme-toggle:hover { border-color: var(--l-bright); color: #fff; }
+body.theme-light .nav-burger { color: #fff; }
+
+/* ---- the fold stays dark, full width ----
+   .hero-simple is a centred max-width grid, so the band is painted by a
+   pseudo element stretched to the viewport behind it. */
+body.theme-light .hero-simple { position: relative; z-index: 0; }
+body.theme-light .hero-simple::before {
+  content: "";
+  position: absolute; top: 0; bottom: 0; left: 50%;
+  width: 100vw; transform: translateX(-50%); z-index: -2;
+  /* deeper and bluer than the night page: the white panel has to land on
+     something saturated, or the two just meet in the middle as grey */
+  background:
+    radial-gradient(1000px 700px at 80% 30%, rgba(70,180,255,0.26), transparent 60%),
+    linear-gradient(168deg, #062f66 0%, #0a4184 45%, #073063 74%, #051f45 100%);
+}
+/* the hard blue edge that closes the fold, sheared like the reference */
+/* ---- the band that closes the fold ----
+   A 10 px rule was not an edge, it was a hairline, and the dark just faded
+   into the white. This is the reference's actual device: a full-bleed block of
+   saturated blue, deep enough to be a section in its own right, with both ends
+   sheared and a darker chevron driven in from each side. */
+.daystrip { display: none; }
+body.theme-light .daystrip {
+  display: block;
+  /* #landing is a flex column, so a new child is shrinkable by default and
+     gets squeezed to zero height — it has to opt out */
+  flex: none;
+  position: relative;
+  margin: 0 0 clamp(30px, 5vw, 62px);
+  background: linear-gradient(100deg, #0a6ec0 0%, var(--l-blue) 38%, #1b95ea 100%);
+  overflow: hidden;
+}
+/* chevrons cut in from the left and right, the way theirs are */
+body.theme-light .daystrip::before,
+body.theme-light .daystrip::after {
+  content: "";
+  position: absolute; top: 0; bottom: 0; width: clamp(90px, 16vw, 260px);
+  background: rgba(4,32,58,0.34);
+}
+body.theme-light .daystrip::before {
+  left: 0; clip-path: polygon(0 0, 100% 0, calc(100% - 46px) 100%, 0 100%);
+}
+body.theme-light .daystrip::after {
+  right: 0; clip-path: polygon(46px 0, 100% 0, 100% 100%, 0 100%);
+}
+body.theme-light .daystrip-in {
+  position: relative; z-index: 1;
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: clamp(18px, 5vw, 64px);
+  max-width: 1180px; margin: 0 auto;
+  padding: clamp(20px, 3vw, 30px) clamp(20px, 5vw, 56px);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: clamp(10px, 1.05vw, 12px); letter-spacing: 0.22em;
+  color: rgba(255,255,255,0.82); text-transform: uppercase;
+}
+body.theme-light .daystrip-in b {
+  font-family: 'Anton', sans-serif; font-weight: 400;
+  font-size: clamp(17px, 1.9vw, 23px); letter-spacing: 0.03em;
+  color: #fff; margin-right: 8px; vertical-align: -2px;
+}
+
+/* Everything inside the dark band keeps the night palette. Without this the
+   page-level text colour is inherited and the headline goes charcoal on navy. */
+body.theme-light .hero-simple { color: var(--text); }
+body.theme-light .hero-left h1 { color: var(--text); }
+body.theme-light .hero-sub { color: var(--dim); }
+body.theme-light .globe-label { color: var(--dim); }
+
+/* ---- white below the fold ---- */
+body.theme-light .features,
+body.theme-light .seo { background: transparent; }
+body.theme-light .feat-kicker,
+body.theme-light .fc-kicker { color: var(--l-blue); }
+body.theme-light .feat-title { color: var(--l-ink); }
+body.theme-light .feat-title .o { color: var(--l-blue); }
+body.theme-light .feat-title::after {
+  content: "";
+  display: block; width: 88px; height: 4px; margin: 18px 0 0;
+  background: var(--l-bright);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 6px 100%);
+}
+body.theme-light .feat-card {
+  background: var(--l-card); border-color: var(--l-line); border-radius: 0;
+  box-shadow: 0 1px 2px rgba(9,26,48,0.06), 0 10px 26px rgba(9,26,48,0.07);
+}
+body.theme-light .feat-card:hover { border-color: var(--l-blue); }
+body.theme-light .fc-title { color: var(--l-ink); }
+body.theme-light .feat-card p,
+body.theme-light .feat-card.wide p { color: var(--l-body); }
+
+body.theme-light .shot-band { border-color: var(--l-line); border-radius: 0; }
+body.theme-light .shot-title { color: #fff; }
+body.theme-light .shot-title .o { color: var(--l-bright); }
+
+body.theme-light .seo { border-color: var(--l-line); }
+body.theme-light .seo h2,
+body.theme-light .seo h3 { color: var(--l-ink); }
+body.theme-light .seo p,
+body.theme-light .seo li { color: var(--l-body); }
+body.theme-light .seo li::before { color: var(--l-blue); }
+body.theme-light .menu-foot { color: var(--l-dim); border-color: var(--l-line); }
+body.theme-light .menu-foot a { color: var(--l-blue); }
+
+/* ---- the picker: white glass, not blue glass ----
+   A white tint over a blue backdrop still composites BLUE. The way iOS keeps
+   its glass neutral over any wallpaper is to treat the backdrop first — pull
+   the saturation almost out of it and lift the brightness — and only then lay
+   the white tint on top. So the blue behind goes pale grey, the shapes still
+   move through it, and the pane reads white.
+
+   Because the pane is light, everything printed on it is dark again. The TILES
+   stay opaque: glass on glass is what fogged the aircraft, and the renders are
+   white aeroplanes shot on white. */
+body.theme-light .setup-card {
+  background: linear-gradient(150deg, rgba(255,255,255,0.66), rgba(255,255,255,0.56) 48%, rgba(255,255,255,0.62));
+  /* brightness was 1.55, which amplified every variation in the gradient behind
+     the pane into visible patches. The tint carries the lightness now; the
+     filter only neutralises and blurs. */
+  backdrop-filter: blur(26px) saturate(45%) brightness(1.12);
+  -webkit-backdrop-filter: blur(26px) saturate(45%) brightness(1.12);
+  border: 1px solid rgba(255,255,255,0.85);
+  border-radius: 26px;
+  /* clip the backdrop to the rounded box and give it its own compositing
+     layer — without this the filtered region leaks past the corners as a hard
+     edged rectangle */
+  overflow: hidden;
+  isolation: isolate;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.95),
+    inset 0 -1px 0 rgba(255,255,255,0.35),
+    0 26px 60px rgba(2,12,28,0.45);
+}
+body.theme-light .setup-step.sel { background: transparent; }
+
+/* printed on light glass */
+body.theme-light .step-head { color: var(--l-ink); }
+body.theme-light .step-no { background: var(--l-blue); border-color: var(--l-blue); color: #fff; }
+body.theme-light .step-change { color: var(--l-blue); }
+body.theme-light .step-change:hover { color: var(--l-ink); }
+
+body.theme-light .fleet-card { background: #0b1728; border-color: rgba(6,18,34,0.25); }
+body.theme-light .fleet-card:hover { border-color: var(--l-blue); background: #0e1e34; }
+body.theme-light .fleet-card.sel {
+  border-color: var(--l-blue); background: #10294a;
+  box-shadow: 0 0 0 1px var(--l-blue), 0 8px 22px rgba(13,127,216,0.30);
+}
+
+/* wells on the glass: frosted white, dark text */
+body.theme-light #search-input,
+body.theme-light .friend-row input,
+body.theme-light .cs2-input {
+  background: rgba(255,255,255,0.72); border-color: rgba(9,40,74,0.18); color: var(--l-ink);
+}
+body.theme-light #search-input:focus { border-color: var(--l-blue); }
+body.theme-light #search-input::placeholder { color: var(--l-dim); }
+body.theme-light .search-note,
+body.theme-light .friend-label { color: #4b5c73; }
+body.theme-light .search-drop {
+  background: rgba(255,255,255,0.96); border-color: rgba(9,40,74,0.16);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 16px 40px rgba(2,12,28,0.28);
+}
+body.theme-light .search-drop .place { color: var(--l-body); border-color: rgba(9,40,74,0.10); }
+body.theme-light .search-drop .place:hover { background: var(--l-pale); color: var(--l-ink); }
+body.theme-light .qchip {
+  background: rgba(255,255,255,0.70); border-color: rgba(9,40,74,0.20); color: var(--l-body);
+}
+body.theme-light .qchip:hover { background: #fff; border-color: var(--l-blue); color: var(--l-blue); }
+body.theme-light .btn-ghost { border-color: rgba(9,40,74,0.28); color: var(--l-ink); }
+body.theme-light .btn-ghost:hover { border-color: var(--l-blue); color: var(--l-blue); background: rgba(255,255,255,0.65); }
+body.theme-light .link-btn { color: #55677f; }
+body.theme-light .link-btn:hover { color: var(--l-blue); border-bottom-color: var(--l-blue); }
+body.theme-light .cf-opts { background: rgba(255,255,255,0.55); border-color: rgba(9,40,74,0.16); }
+body.theme-light .cf-opt label { color: var(--l-blue); }
+
+/* the one sheared shape, on the action that matters */
+body.theme-light .btn-primary {
+  background: var(--l-blue); border-color: var(--l-blue); color: #fff;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+}
+body.theme-light .btn-primary:hover { background: var(--l-bright); border-color: var(--l-bright); }
+
+/* the spec overlay is the same pane of glass */
+body.theme-light .spec-sheet {
+  background: linear-gradient(150deg, rgba(255,255,255,0.72), rgba(255,255,255,0.58) 50%, rgba(255,255,255,0.66));
+  backdrop-filter: blur(30px) saturate(45%) brightness(1.12);
+  -webkit-backdrop-filter: blur(30px) saturate(45%) brightness(1.12);
+  border-color: rgba(255,255,255,0.85); border-radius: 22px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), 0 26px 60px rgba(2,12,28,0.45);
+}
+body.theme-light .spec-title { color: var(--l-ink); }
+body.theme-light .spec-kicker,
+body.theme-light .spec-cell label { color: var(--l-dim); }
+body.theme-light .spec-desc,
+body.theme-light .spec-cell span { color: var(--l-body); }
+body.theme-light .spec-cell { background: rgba(255,255,255,0.6); border-color: rgba(9,40,74,0.14); }
+body.theme-light .spec-close { color: var(--l-dim); }
+body.theme-light .spec-close:hover { color: var(--l-ink); }
+
+/* ---- breathing room ----
+   The headline started immediately under the bar, and CONTINUE sat almost on
+   the card's bottom edge with the fleet list running straight into it. */
+body.theme-light .hero-simple {
+  padding-top: clamp(44px, 7.5vh, 104px);
+  padding-bottom: clamp(34px, 5.5vh, 72px);
+}
+body.theme-light .setup-card {
+  padding: clamp(22px, 2.2vw, 30px) clamp(18px, 1.9vw, 26px) clamp(32px, 3.6vw, 48px);
+}
+/* a real gap between the list and the button, not just the card's padding */
+body.theme-light .setup-step.sel { gap: clamp(12px, 1.6vw, 22px); }
+
+/* ---- NIGHT: landing page lifted off near-black (trial) ----
+   Scoped to #landing, and the palette variables are redefined HERE rather than
+   on :root, so the cockpit HUD, the loader and the mission panels keep the
+   original near-black values. Deleting this block restores the old page
+   exactly. */
+body:not(.theme-light) #landing {
+  --panel:  #0b1523;
+  --panel2: #101f35;
+  --line:   #1d3049;
+  background:
+    radial-gradient(1100px 700px at 82% 40%, rgba(47,111,255,0.16), transparent 55%),
+    radial-gradient(700px 500px at 0% 100%, rgba(110,168,255,0.06), transparent 55%),
+    #060e1a;
+}
+body:not(.theme-light) .topnav { background: rgba(5,12,23,0.92); }
+body:not(.theme-light) .setup-card { background: rgba(11,22,37,0.55); }
+/* a little air under the bar before the headline (day theme sets its own) */
+body:not(.theme-light) .hero-simple { padding-top: clamp(28px, 4.5vh, 58px); }
+
+/* ============================= FULL-BLEED PLATE =============================
+   A picture given the whole width and nothing written on it. The Grand Canyon
+   band already does the contained-card-with-a-headline-over-it treatment, so
+   this one deliberately does the reverse: edge to edge, no overlay, and the
+   caption set underneath the way a plate is captioned in a book. */
+.plate {
+  margin: clamp(46px, 7vw, 96px) 0 clamp(30px, 4vw, 56px);
+  position: relative; left: 50%; width: 100vw; transform: translateX(-50%);
+}
+.plate-img {
+  display: block; width: 100%; height: clamp(240px, 42vh, 460px);
+  object-fit: cover; object-position: 50% 64%;
+}
+.plate-cap {
+  max-width: 900px; margin: 0 auto;
+  padding: 16px clamp(20px, 4vw, 44px) 0;
+  font-size: 13.5px; line-height: 1.6; color: var(--dim);
+}
+.plate-cap b { color: var(--text); font-weight: 600; }
+
+body.theme-light .plate-cap { color: #5d6d83; }
+body.theme-light .plate-cap b { color: var(--l-ink); }
+/* the wordmark goes home from anywhere */
+.nav-brand { color: var(--text); text-decoration: none; }
+.nav-brand:hover .brand-mark { color: var(--blue-soft); }
+
+
+/* ---- fly with a friend: a disclosure, not a billboard ----
+   Open by default it was the loudest thing in step 2 and people typed their
+   home city into it. Closed, the search box above is unmistakably the way in. */
+.friend-wrap { padding: 0; }
+.friend-wrap > .friend-label {
+  list-style: none; cursor: pointer; margin: 0;
+  padding: 11px 14px; display: flex; align-items: center; gap: 8px;
+}
+.friend-wrap > .friend-label::-webkit-details-marker { display: none; }
+.friend-wrap > .friend-label::after {
+  content: '+'; margin-left: auto; font-size: 14px; line-height: 1;
+  color: var(--blue-soft); transition: transform 0.2s;
+}
+.friend-wrap[open] > .friend-label::after { content: '−'; }
+.friend-wrap > .friend-label:hover { color: var(--text); }
+.friend-body { padding: 0 14px 12px; }
+
+/* ---- invisibility warning ----
+   Ghost mode stops your aircraft being broadcast at all, so to everyone else
+   you simply are not there. That must never be on without you knowing. */
+#ghost-badge {
+  position: absolute; top: 52px; left: 50%; transform: translateX(-50%);
+  z-index: 24; cursor: pointer; white-space: nowrap;
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em;
+  color: #ffd28a; background: rgba(60,34,4,0.92); border: 1px solid #ffb020;
+  border-radius: 8px; padding: 7px 13px;
+  animation: ghostpulse 2.2s ease-in-out infinite;
+}
+#ghost-badge[hidden] { display: none; }
+@keyframes ghostpulse { 50% { border-color: rgba(255,176,32,0.35); } }
+@media (max-width: 720px) {
+  #ghost-badge { font-size: 9px; letter-spacing: 0.08em; padding: 5px 9px; top: 46px; }
+}
+
+/* ---- loading: never let it look frozen ----
+   A bar that creeps and then sits still reads as "stuck" — one player waited
+   30 s and assumed it had hung. So: a live percentage, a moving sheen on the
+   bar itself, and after 8 s an explicit note that a slow connection can take
+   up to a minute. */
+.loader-status {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  margin-top: 9px;
+}
+.loader-pct {
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.1em;
+  color: var(--blue-soft); font-variant-numeric: tabular-nums;
+}
+#loader-bar { position: relative; overflow: hidden; }
+/* travels even when the width has not changed, so the bar is never dead */
+#loader-bar::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.55) 50%, transparent 80%);
+  animation: loadsheen 1.5s linear infinite;
+}
+@keyframes loadsheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+/* One quiet line, not a warning panel. The boxed amber version read as an
+   error and its 44ch min width overflowed the loader card on a phone. */
+.loader-slow {
+  margin-top: 9px;
+  color: var(--dim); font-size: 11.5px; line-height: 1.5;
+  max-width: 100%; text-align: center;
+}
+@media (max-width: 520px) { .loader-slow { font-size: 10.5px; } }
+.loader-slow[hidden] { display: none; }
+
+/* VPN warning — the one red thing on the loading screen, so it reads as
+   "act on this" rather than as more status text. Fades in instead of
+   appearing, which stops it looking like an error that just fired. */
+.loader-vpn {
+  margin-top: 10px;
+  padding: 9px 13px;
+  border: 1px solid rgba(255,86,92,0.42);
+  border-radius: 8px;
+  background: rgba(255,60,66,0.08);
+  text-align: center; line-height: 1.5;
+  animation: vpnIn 0.45s ease-out both;
+}
+.loader-vpn b {
+  display: block;
+  color: #ff6a70; font-size: 12.5px; letter-spacing: 0.06em;
+}
+.loader-vpn span {
+  display: block; margin-top: 3px;
+  color: rgba(255,170,174,0.82); font-size: 11px;
+}
+@media (max-width: 520px) {
+  .loader-vpn b { font-size: 11.5px; }
+  .loader-vpn span { font-size: 10.5px; }
+}
+.loader-vpn[hidden] { display: none; }
+@keyframes vpnIn { from { opacity: 0; transform: translateY(-4px); } }
+
+/* SHORT VIEWPORTS — a phone held sideways, which is how this game is played.
+   At 390 px tall the full-size box is ~470 px and the warning fell off the
+   bottom. Tightening the spacing that carries no information brings the whole
+   briefing back inside the screen, so nothing depends on the player scrolling
+   a loading screen they do not know is scrollable. */
+@media (max-height: 560px) {
+  .loader-kicker { margin-bottom: 5px; }
+  .loader-place { font-size: clamp(22px, 5vh, 34px); margin-bottom: 10px; }
+  .brief-list { margin: 4px 0 12px; }
+  .brief-row { padding: 6px 12px; }
+  .loader-slow { margin-top: 6px; }
+  .loader-vpn { margin-top: 7px; padding: 7px 12px; }
+  .loader-tip { margin-top: 8px; }
+}
+
+/* ---- pinned destination card on the globe ----
+   The hover label follows the pointer and vanishes; this one belongs to the
+   destination you actually picked, so it stays on screen (and the globe stops
+   spinning) until you go back or take off. */
+.globe-pin {
+  border-color: var(--blue-soft);
+  background: rgba(6,10,20,0.94);
+  box-shadow: 0 8px 26px rgba(0,0,0,0.5), 0 0 0 1px rgba(90,160,255,0.12);
+}
+.globe-pin::after { border-top-color: var(--blue-soft); }
+.globe-pin .gl-sel {
+  display: block; font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px; letter-spacing: 0.24em; color: var(--blue-soft);
+  margin-bottom: 2px;
+}
+.globe-pin .gl-name { display: block; }
+
+/* ---- top 10 landmark chips ----
+   Ten picks plus SURPRISE ME wrap onto more rows than six did, so the block
+   takes the leftover height of the fixed-height card and scrolls inside it —
+   same trick the aircraft list uses. The card never changes height. */
+.chips-head {
+  font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.22em;
+  color: var(--dim); margin: 2px 0 7px;
+}
+.quick-chips {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  align-content: flex-start; padding-right: 4px;
+  scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+}
+.quick-chips::-webkit-scrollbar { width: 6px; }
+.quick-chips::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+.quick-chips::-webkit-scrollbar-thumb:hover { background: var(--blue); }
+
+/* ---- settings on touch ----
+   The old bespoke touch modal (centred dropdown + its own backdrop, sticky
+   header and z-index lift) is GONE: the shared .wm shell does all of that for
+   every device now, which is the point of unifying them. Only the phone-sized
+   type and tap targets remain. */
+body.is-touch #hud.settings-open { z-index: 55; }
+.sp-title { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.22em; color: var(--blue-soft); }
+.sp-frozen { font-family: 'IBM Plex Mono', monospace; font-size: 8px; letter-spacing: 0.16em; color: var(--dim); }
+body.is-touch .sp-row { padding: 9px 0; gap: 8px; }
+body.is-touch .sp-row label { font-size: 8.5px; letter-spacing: 0.16em; }
+body.is-touch .sp-toggle, body.is-touch #settings-panel .tb-btn { font-size: 9.5px; padding: 6px 9px; }
+body.is-touch #vol-slider,
+body.is-touch #eng-slider,
+body.is-touch #wxvol-slider { width: 78px; }
+
+/* ---- planning map on a landscape phone ----
+   It was filling the screen: .bm-box is 96vw, and the max-height:760px rule
+   squashed the canvas to 52vh with object-fit:cover — which also broke tap
+   accuracy, since the hit test assumes the canvas scales uniformly into its
+   box. Shrink the BOX instead and let the canvas keep its 1024x620 aspect. */
+@media (orientation: landscape) and (max-height: 560px) {
+  body.is-touch .bm-box { width: min(360px, 54vw); padding: 9px 10px; border-radius: 12px; }
+  body.is-touch .bm-head { margin-bottom: 6px; gap: 6px; }
+  body.is-touch #bm-search { font-size: 11px; padding: 6px 9px; }
+  body.is-touch .bm-head .chip { padding: 5px 9px; font-size: 11px; }
+  body.is-touch #bigmap { height: auto; object-fit: fill; }
+  body.is-touch .bm-hint { font-size: 8px; margin-top: 5px; letter-spacing: 0.08em; }
+  body.is-touch #bm-flight { top: 46px; right: 12px; width: min(186px, 46vw); padding: 10px 12px; }
+  body.is-touch #bmf-cs { font-size: 18px; }
+  body.is-touch #bmf-airline { font-size: 9px; margin: 2px 0 8px; }
+}
+.bm-gest-touch { display: none; }
+body.is-touch .bm-gest-mouse { display: none; }
+body.is-touch .bm-gest-touch { display: inline; }
+
+/* ---- locked aircraft (COMING SOON) ----
+   The card stays fully rendered so people can see what is coming and can still
+   open its ⓘ specs. The plate sits over the artwork with a hard drop shadow so
+   it reads as stamped onto the card rather than printed into it. */
+.fleet-card.locked { cursor: not-allowed; }
+.fleet-card.locked:hover { border-color: var(--line); }
+.fleet-card.locked .thumb { filter: grayscale(0.85) brightness(0.5); }
+.fleet-card.locked .mfr,
+.fleet-card.locked .model,
+.fleet-card.locked .role { opacity: 0.42; }
+.soon-plate {
+  position: absolute; left: 50%; top: 42%;
+  transform: translate(-50%, -50%) rotate(-7deg);
+  z-index: 3; pointer-events: none; white-space: nowrap;
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.2em; color: #fff;
+  padding: 7px 14px; border-radius: 6px;
+  background: rgba(10,17,30,0.92);
+  border: 1px solid rgba(255,255,255,0.30);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.75), 0 2px 4px rgba(0,0,0,0.9);
+  text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+}
+/* operator build: same plate, orange, and the card is live */
+.soon-plate.op {
+  background: rgba(48,20,4,0.92); border-color: rgba(255,138,61,0.75);
+  color: #ffb37a; top: 42%;
+}
+.fleet-card:not(.locked) .soon-plate.op { transform: translate(-50%, -50%) rotate(-7deg); }
+@media (max-width: 860px) { .soon-plate { font-size: 9.5px; padding: 5px 10px; letter-spacing: 0.16em; } }
+
+/* ---- timed release plate ----
+   The same stamped plate, but counting. Sits level rather than rotated: the
+   -7deg tilt reads as a rubber stamp, which is right for "COMING SOON" and
+   wrong for a clock — a tilted countdown looks like a mistake. Two lines, the
+   label small and the digits big enough to read across the picker, because a
+   countdown you have to lean in for is just a smudge on the artwork. */
+.soon-plate.timed {
+  top: 44%;
+  transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 8px 15px;
+  background: rgba(20,6,6,0.94);
+  border-color: rgba(255,90,77,0.55);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.78), 0 0 22px rgba(255,60,40,0.24);
+}
+.soon-plate.timed .rl-label { font-size: 9px; letter-spacing: 0.24em; color: #ff9f95; opacity: 0.9; }
+/* tabular-nums is belt and braces on a monospace face, but it costs nothing
+   and stops the plate breathing if the font ever falls back */
+.soon-plate.timed .rl-clock {
+  font-size: 15px; letter-spacing: 0.04em; font-weight: 600;
+  font-variant-numeric: tabular-nums; color: #ff6b5e;
+  text-shadow: 0 0 12px rgba(255,70,50,0.55), 0 2px 4px rgba(0,0,0,0.9);
+}
+@media (max-width: 860px) {
+  .soon-plate.timed { padding: 6px 11px; gap: 2px; }
+  .soon-plate.timed .rl-label { font-size: 7.5px; letter-spacing: 0.18em; }
+  .soon-plate.timed .rl-clock { font-size: 12.5px; }
+}
+
+/* ---- helicopter: touch pad ----
+   Landing gear, flaps and wheel brakes do not exist on a rotary wing, so the
+   touch buttons for them are removed instead of sitting there doing nothing.
+   The stick, collective slider and pedals all map straight across. */
+body.heli-mode #btn-gear,
+body.heli-mode #btn-flaps,
+body.heli-mode #btn-brake { display: none; }
+
+
+
+/* ---- controls panel: sections + scroll ----
+   Two labelled blocks (keyboard, then controller) inside a scroller, so the
+   panel can grow without ever running off a laptop screen. The header and the
+   close button stay put; only the list moves. */
+/* .help-box sizing and .help-scroll behaviour now come from .wm-box/.wm-body. */
+.help-sec {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.24em;
+  color: var(--blue-soft); margin: 18px 0 8px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--line);
+}
+.help-sec:first-child { margin-top: 4px; }
+.help-sec span {
+  color: var(--dim); letter-spacing: 0.14em; margin-left: 8px; font-size: 9px;
+}
+.help-note a { color: var(--blue-soft); text-decoration: none; border-bottom: 1px solid var(--line); }
+.help-note a:hover { color: var(--text); border-color: var(--blue); }
+/* the flight is frozen while this is open — say so rather than leaving people
+   wondering why the world stopped */
+#help-frozen {
+  font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.18em;
+  color: var(--dim); margin-left: 10px;
+}
+
+/* ---- controller prompt ----
+   A centred modal over a dimmed backdrop. It only ever appears once a pad is
+   genuinely connected AND the consent screen has been answered, so it can never
+   stack on top of the terms popup on a first visit. */
+#pad-ask {
+  position: fixed; inset: 0; z-index: 92;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(3,7,14,0.62); backdrop-filter: blur(3px);
+  animation: padfade 0.25s ease-out;
+}
+#pad-ask[hidden] { display: none; }
+@keyframes padfade { from { opacity: 0; } }
+.pad-ask-box {
+  width: min(400px, calc(100vw - 40px));
+  background: linear-gradient(180deg, rgba(14,26,46,0.98), rgba(9,15,27,0.98));
+  border: 1px solid var(--blue); border-radius: 16px;
+  padding: 26px 28px 22px; text-align: center;
+  box-shadow: 0 30px 90px rgba(0,0,0,0.75), 0 0 0 1px rgba(90,160,255,0.14),
+              0 0 60px rgba(47,111,255,0.18);
+  animation: padpop 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@keyframes padpop { from { opacity: 0; transform: translateY(14px) scale(0.96); } }
+.pad-ask-icon { font-size: 34px; line-height: 1; margin-bottom: 10px; }
+.pad-ask-title {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.24em;
+  color: var(--blue-soft);
+}
+.pad-ask-name {
+  font-family: 'Anton', sans-serif; font-size: 22px; letter-spacing: 0.02em;
+  color: #fff; margin: 6px 0 10px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pad-ask-sub { font-size: 12.5px; line-height: 1.6; color: var(--dim); margin: 0 0 18px; }
+.pad-ask-btns { display: flex; flex-direction: column; gap: 8px; }
+.pad-ask-btns .btn-primary { width: 100%; padding: 12px; font-size: 13px; }
+.pad-ask-btns .chip { width: 100%; padding: 10px; }
+
+/* OFF sits next to HIDE because that is where people look when the radio is
+   bothering them. HIDE only minimises -- the calls keep coming -- so the panel
+   needs a control that actually stops it.
+
+   SOLID RED, not a tint. The subtle version read as a status label saying the
+   ATC was off, rather than a button that turns it off, and a player who is
+   being nagged about their altitude should not have to hunt for the way out.
+   The freq shrinks to pay for the extra width. */
+#atc-off {
+  flex-shrink: 0; cursor: pointer; font-weight: 700;
+  background: #c62f2f; border: 1px solid #ff6b6b;
+  border-radius: 3px; padding: 4px 8px; color: #fff;
+  font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.14em;
+  box-shadow: 0 1px 6px rgba(198,47,47,0.45);
+  transition: background 0.15s, transform 0.1s;
+}
+#atc-off:hover { background: #e23b3b; transform: translateY(-1px); }
+#atc-off:active { transform: translateY(0); }
+#atc.collapsed #atc-off { display: none; }
+
+/* While an emergency is declared the panel goes red. You have just told the
+   controller you are in trouble; the radio should not look like it always
+   does. */
+#atc.emerg { border-color: rgba(255,86,86,0.55); box-shadow: 0 0 24px rgba(255,60,60,0.20); }
+#atc.emerg .atc-dot { background: #ff5656; }
+#atc.emerg .atc-head { background: rgba(255,86,86,0.10); }
+#atc.emerg #atc-station { color: #ff9b9b; }
+
+/* The header now carries two buttons, so the frequency gives up its room
+   first and the station name keeps a readable minimum before it ellipses. */
+#atc-freq { font-size: 9px; opacity: 0.75; }
+.atc-head b { min-width: 46px; }
+@media (max-width: 520px) { #atc-freq { display: none; } }
+
+/* TOUCH TARGETS. Measured on a 375px phone the OFF button was 35x19 and the
+   option chips 27px tall — well under the ~44px a thumb needs, and OFF is
+   precisely the control an annoyed player is jabbing at. Desktop keeps the
+   compact sizes; only touch pays the extra pixels. */
+body.is-touch #atc-off { padding: 9px 11px; font-size: 10px; }
+body.is-touch #atc-min { padding: 10px 11px; font-size: 10px; }
+body.is-touch .atc-head { gap: 6px; padding: 7px 9px; }
+body.is-touch .atc-opts .chip { min-height: 40px; padding: 9px 10px; }
+body.is-touch #atc-call { min-height: 42px; }
+
+/* The you-just-turned-something-off toast. Bigger, brighter, and it sits
+   there long enough to actually be read — 9 s vs the usual 4. A player who
+   kills the radio in irritation is exactly the player who will not remember
+   where it went. */
+#toast.big {
+  top: 84px; font-size: 15px; font-weight: 600; letter-spacing: 0.02em;
+  width: max-content; min-width: 0; max-width: min(480px, 92vw);
+  padding: 16px 26px; border-width: 2px; border-color: #ff6b6b;
+  background: rgba(26,10,12,0.96); color: #ffe3e3;
+  box-shadow: 0 6px 28px rgba(198,47,47,0.35);
+}
+
+/* Discord CTA under the globe — sits right below the "N pilots flying" line,
+   which is exactly the moment a visitor is thinking about other players.
+   Brand blurple on an outline chip so it reads as a link to somewhere, not
+   another internal button. */
+.hero-discord {
+  display: inline-flex; align-items: center; gap: 9px;
+  margin-top: 12px; padding: 9px 16px;
+  border: 1px solid rgba(88,101,242,0.55); border-radius: 8px;
+  background: rgba(88,101,242,0.12); color: #aab4ff;
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em;
+  text-decoration: none; transition: background 0.15s, transform 0.12s, color 0.15s;
+}
+.hero-discord svg { width: 18px; height: 18px; fill: currentColor; flex: 0 0 auto; }
+.hero-discord b { font-weight: 700; color: #cdd4ff; }
+.hero-discord span { color: rgba(170,180,255,0.75); letter-spacing: 0.06em; }
+.hero-discord:hover { background: #5865F2; color: #fff; transform: translateY(-1px); }
+.hero-discord:hover b, .hero-discord:hover span { color: #fff; }
+@media (max-width: 860px) {
+  .hero-discord { margin: 10px auto 0; }
+  .hero-discord span { display: none; }   /* keep it one short line on phones */
+}
+
+/* ASSIGNED-GATE LOCATOR. Same beam and label as the destination marker, in
+   green so it reads instantly as "this one is where you park", not another
+   place to fly to. It only ever exists between touchdown and arriving at the
+   stand, so the two are never on screen competing for the same meaning. */
+.dm-beam.dm-green {
+  background: linear-gradient(to top,
+    rgba(61,220,132,0) 0%,
+    rgba(61,220,132,0.18) 12%,
+    rgba(120,255,180,0.92) 100%);
+  box-shadow: 0 0 14px rgba(61,220,132,0.65);
+}
+.dm-marker.dm-green .dm-label {
+  border-color: rgba(61,220,132,0.55);
+  background: rgba(6,26,16,0.82);
+  color: #d6ffe8;
+}
+.dm-marker.dm-green .dm-label b { color: #7dffb4; }
+.dm-marker.dm-green .dm-pin {
+  color: #7dffb4;
+  text-shadow: 0 0 10px rgba(61,220,132,0.9), 0 2px 8px rgba(0,0,0,0.6);
+}
+
+/* ============================ HUD SCALE (desktop) ============================
+   WHY: every HUD element is authored in fixed CSS pixels, sized to look right
+   on a desktop monitor (2560x1440-class). Phones got their own scaled layout,
+   but LAPTOPS got nothing — and a Retina MacBook reports a small logical
+   viewport (a 14" MBP is 1512x982 CSS px), so the same 340px instrument panel
+   that covers 26% of a gaming monitor's height covered 38% of the MacBook's,
+   with the minimap eating another quarter. "The HUD takes a third of my
+   screen" was arithmetic, not perception.
+
+   HOW: one root variable, set from the viewport by applyHudScale() in main.js,
+   applied as a transform so canvases keep their full-resolution backing store
+   and simply render smaller (sharper, never blurrier). Origins match each
+   element's screen anchor so nothing drifts. Touch layouts are untouched —
+   they already solved this their own way. */
+:root { --hud-s: 1; }
+body:not(.is-touch) #pfd {
+  transform: translateX(-50%) scale(var(--hud-s));
+  transform-origin: 50% 100%;
+}
+body:not(.is-touch) #readouts {
+  transform: translateX(-50%) scale(var(--hud-s));
+  transform-origin: 50% 100%;
+}
+body:not(.is-touch) #minimap-wrap {
+  transform: scale(var(--hud-s));
+  transform-origin: 100% 100%;
+}
+body:not(.is-touch) #compass-wrap {
+  transform: scale(var(--hud-s));
+  transform-origin: 0 0;
+}
+body:not(.is-touch) #atc {
+  transform: translateY(-50%) scale(var(--hud-s));
+  transform-origin: 0 50%;
+}
+/* anchored above the PFD by the PFD's own height — which is now scaled */
+body:not(.is-touch) #start-hint {
+  bottom: calc(clamp(90px, 14vh, 130px) + 8px + 240px * var(--hud-s));
+  transform: translateX(-50%) scale(var(--hud-s));
+  transform-origin: 50% 100%;
+}
+
+/* AI aircraft panel on the start screen */
+.ai-panel { margin-top: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; }
+.ai-head { font-size: 11px; letter-spacing: 0.08em; color: var(--dim); margin-bottom: 8px; }
+.ai-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+.ai-row select, .ai-row button { font: inherit; font-size: 12px; padding: 6px 8px; background: #0c1422; color: #eaf1ff; border: 1px solid var(--line); border-radius: 4px; }
+.ai-row select:disabled { opacity: 0.5; }
+.ai-row button { cursor: pointer; }
+.ai-list { margin-top: 8px; font-size: 12px; color: var(--dim); }
+.ai-list > div { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; }
+.ai-list button { background: none; border: none; color: #ff8a8a; cursor: pointer; font: inherit; font-size: 12px; }
+
+/* Spawner menu: scrolls when it outgrows the screen, so long lists stay reachable */
+.setup-card { max-height: calc(100vh - 120px); overflow-y: auto; overscroll-behavior: contain; }
+.ai-panel { max-height: 38vh; overflow-y: auto; overscroll-behavior: contain; }
+.ai-list { max-height: 14vh; overflow-y: auto; }
+/* enemy tray: larger, so the list and its controls are easy to read and use */
+.ai-panel { max-height: 46vh; padding: 14px; margin-top: 16px; }
+.ai-head { font-size: 13px; margin-bottom: 10px; }
+.ai-row { margin-top: 8px; gap: 8px; }
+.ai-row select, .ai-row button { font-size: 15px; padding: 8px 10px; }
+.ai-list { max-height: 26vh; margin-top: 10px; font-size: 15px; }
+.ai-list > div { padding: 6px 0; }
+.ai-list button { font-size: 15px; }
+
+/* Optional aircraft failures panel */
+#failures-panel{position:fixed;right:14px;top:76px;z-index:80;width:min(360px,calc(100vw - 28px));padding:12px;background:rgba(7,13,22,.96);border:1px solid #38516d;border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.55);color:#dce8f5;font:12px ui-monospace,Consolas,monospace}
+.fail-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}.fail-head b{font-size:14px;letter-spacing:1.5px;color:#ffb45d}.fail-head span{flex:1;color:#9eb3c9;font-size:9px;text-align:right}.fail-head button{background:transparent;border:1px solid #40536a;color:#dce8f5;border-radius:4px;padding:4px 7px;cursor:pointer}
+.fail-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.fail-grid button,.fail-reset{background:#172536;border:1px solid #3b536d;color:#dce8f5;border-radius:4px;padding:9px 6px;font:600 9px ui-monospace,Consolas,monospace;cursor:pointer;text-align:center}.fail-grid button:hover,.fail-reset:hover{border-color:#ff9c4b;color:#fff;background:#293448}.fail-reset{width:100%;margin-top:8px;color:#ffb45d}.failures-panel small,#failures-panel small{display:block;margin-top:8px;color:#778ba2;font-size:9px;text-align:center}
+#tgl-destruction.on{border-color:#e58c3c;color:#ffbd78}
+@media(max-width:600px){#failures-panel{top:auto;bottom:76px;right:8px;width:min(340px,calc(100vw - 16px));}.fail-grid button{font-size:8px;padding:8px 4px}}
+
+.fail-grid button.fail-wide{grid-column:1 / -1;color:#ff7a5b}
+
+/* centre engine failures: shown only for trijets */
+.tri-only { display: none; }
+.tri-only.on { display: inline-block; }
